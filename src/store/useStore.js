@@ -20,7 +20,8 @@ export const PAGE_CONFIG = {
   students:      { title: 'Students',           btnLabel: '+ Add Student',    btnRoles: ['admin']                  },
   timetable:     { title: 'Timetable',          btnLabel: null,               btnRoles: []                         },
   attendance:    { title: 'Attendance',         btnLabel: 'Save',             btnRoles: ['admin','teacher']        },
-  marks:         { title: 'Marks Entry',        btnLabel: 'Save All',         btnRoles: ['admin','teacher']        },
+  marks:         { title: 'Marks Entry',        btnLabel: 'Save All',              btnRoles: ['admin','teacher']   },
+  questionpapers:{ title: 'Question Papers',    btnLabel: '+ Generate with AI',    btnRoles: ['admin','teacher']   },
   academics:     { title: 'Academics',          btnLabel: '+ Add',            btnRoles: ['admin']                  },
   staff:         { title: 'Staff',              btnLabel: '+ Add Staff',      btnRoles: ['admin']                  },
   reports:       { title: 'Reports',            btnLabel: '+ Generate Report',btnRoles: ['admin']                  },
@@ -46,6 +47,10 @@ const useStore = create((set, get) => ({
   schoolId:    null,   // uuid — null for superadmin
   searchQuery: '',
 
+  // ── Router bridge (set by RouteSync in App.jsx) ───────────────────────────
+  _navigate: null,
+  _setNavigate: (fn) => set({ _navigate: fn }),
+
   // ── Auth ──────────────────────────────────────────────────────────────────
   login: async (email, password) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
@@ -67,9 +72,9 @@ const useStore = create((set, get) => ({
       userRole:    profile.role,
       schoolId:    profile.school_id ?? null,
       user:        { name: profile.name, initials: getInitials(profile.name), role: ROLE_LABELS[profile.role] ?? profile.role },
-      activePage:  'dashboard',
       searchQuery: '',
     })
+    get()._navigate?.('/dashboard')
     return { ok: true }
   },
 
@@ -79,6 +84,7 @@ const useStore = create((set, get) => ({
       isLoggedIn: false, userRole: null, user: null, schoolId: null,
       activePage: 'dashboard', searchQuery: '', authLoading: false,
     })
+    get()._navigate?.('/login')
   },
 
   // Called from App.jsx on mount to restore an existing session
@@ -101,7 +107,6 @@ const useStore = create((set, get) => ({
         userRole:    profile.role,
         schoolId:    profile.school_id ?? null,
         user:        { name: profile.name, initials: getInitials(profile.name), role: ROLE_LABELS[profile.role] ?? profile.role },
-        activePage:  'dashboard',
         searchQuery: '',
       })
     }
@@ -113,7 +118,10 @@ const useStore = create((set, get) => ({
   setSidebarOpen: (v) => set({ sidebarOpen: v }),
   toggleSidebar:  ()  => set(s => ({ sidebarOpen: !s.sidebarOpen })),
 
-  setActivePage:  (page) => set({ activePage: page, searchQuery: '', sidebarOpen: false }),
+  setActivePage: (page) => {
+    set({ activePage: page, searchQuery: '', sidebarOpen: false })
+    get()._navigate?.(`/${page}`)
+  },
   setSearchQuery: (q)    => set({ searchQuery: q }),
 
   // ── Topbar action ─────────────────────────────────────────────────────────

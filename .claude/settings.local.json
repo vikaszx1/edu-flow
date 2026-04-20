@@ -11,7 +11,8 @@
       "Bash(npm install:*)",
       "mcp__supabase__execute_sql",
       "mcp__supabase__get_logs",
-      "Bash(npx vite:*)"
+      "Bash(npx vite:*)",
+      "Bash(npm run:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

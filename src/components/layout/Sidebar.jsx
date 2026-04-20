@@ -1,8 +1,9 @@
 import {
   LayoutGrid, Users, Calendar, ClipboardCheck, FileEdit,
   UserCog, FileBarChart2, Settings, LogOut, Layers,
-  GraduationCap, History, FileText, Building2, CreditCard, Server, X, BookOpen,
+  GraduationCap, History, FileText, Building2, CreditCard, Server, X, BookOpen, Wand2,
 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import useStore from '../../store/useStore'
 
 const NAV_MAIN = [
@@ -10,7 +11,8 @@ const NAV_MAIN = [
   { id: 'students',   label: 'Students',    icon: Users,          roles: ['admin','teacher'],                        badge: '842' },
   { id: 'timetable',  label: 'Timetable',   icon: Calendar,       roles: ['admin','teacher','student'],              badge: null },
   { id: 'attendance', label: 'Attendance',  icon: ClipboardCheck, roles: ['admin','teacher'],                        badge: null },
-  { id: 'marks',      label: 'Marks Entry', icon: FileEdit,       roles: ['admin','teacher'],                        badge: null },
+  { id: 'marks',           label: 'Marks Entry',        icon: FileEdit,  roles: ['admin','teacher'],           badge: null },
+  { id: 'questionpapers', label: 'Question Papers',    icon: Wand2,     roles: ['admin','teacher'],           badge: null },
 ]
 
 const NAV_ADMIN = [
@@ -82,6 +84,7 @@ function NavSection({ label, items, activePage, onNav, role }) {
 export default function Sidebar() {
   const { activePage, userRole, user, setActivePage, logout, toast } = useStore()
   const setSidebarOpen = useStore(s => s.setSidebarOpen)
+  const navigate = useNavigate()
 
   return (
     <div
@@ -92,7 +95,7 @@ export default function Sidebar() {
       <div
         className="px-4 py-5 pb-3.5 flex items-center gap-2.5 border-b cursor-pointer"
         style={{ borderColor: 'rgba(255,255,255,0.08)' }}
-        onClick={() => setActivePage('dashboard')}
+        onClick={() => { setSidebarOpen(false); navigate('/') }}
       >
         <div
           className="w-[34px] h-[34px] rounded-[9px] flex items-center justify-center flex-shrink-0"
