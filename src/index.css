@@ -1,0 +1,57 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --pri: #1a3a5c;
+  --acc: #e87c3e;
+  --teal: #1d9e75;
+  --purp: #534ab7;
+  --amb: #ba7517;
+  --bg: #f7f6f2;
+  --surf: #fff;
+  --bdr: #e8e5de;
+  --txt: #1c1b18;
+  --mut: #6b6960;
+  --lgt: #a8a49a;
+  --red: #e24b4a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--txt);
+  font-size: 14px;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-thumb { background: var(--bdr); border-radius: 4px; }
+
+/* Avatar color variants */
+.av-bl { background: #e6f1fb; color: #185fa5; }
+.av-tl { background: #e1f5ee; color: #0f6e56; }
+.av-co { background: #faece7; color: #993c1d; }
+.av-pu { background: #eeedfe; color: #534ab7; }
+.av-am { background: #faeeda; color: #854f0b; }
+.av-pk { background: #fbeaf0; color: #993556; }
+.av-gn { background: #eaf3de; color: #3b6d11; }
+
+/* Badge variants */
+.badge-green  { background: #eaf3de; color: #3b6d11; }
+.badge-amber  { background: #faeeda; color: #854f0b; }
+.badge-red    { background: #fcebeb; color: #a32d2d; }
+.badge-blue   { background: #e6f1fb; color: #185fa5; }
+.badge-gray   { background: #f1efe8; color: #5f5e5a; }
+.badge-purple { background: #eeedfe; color: #534ab7; }
+
+/* Sync pulse */
+@keyframes syncpulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.sync-dot { animation: syncpulse 2s infinite; }
