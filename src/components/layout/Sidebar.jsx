@@ -85,7 +85,7 @@ export default function Sidebar() {
 
   return (
     <div
-      className="w-[210px] flex flex-col flex-shrink-0 min-h-screen lg:min-h-screen h-full overflow-y-auto"
+      className="w-[210px] flex flex-col flex-shrink-0 h-full overflow-y-auto"
       style={{ background: 'var(--pri)' }}
     >
       {/* Logo */}

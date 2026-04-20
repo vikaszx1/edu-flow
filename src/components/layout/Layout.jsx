@@ -7,7 +7,7 @@ export default function Layout({ children }) {
   const setSidebarOpen = useStore(s => s.setSidebarOpen)
 
   return (
-    <div className="flex min-h-screen w-full">
+    <div className="flex h-screen w-full overflow-hidden">
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
