@@ -49,6 +49,18 @@ body {
 .badge-gray   { background: #f1efe8; color: #5f5e5a; }
 .badge-purple { background: #eeedfe; color: #534ab7; }
 
+/* Skeleton shimmer */
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position:  400px 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, #eeece6 25%, #e4e1da 50%, #eeece6 75%);
+  background-size: 800px 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+  border-radius: 6px;
+}
+
 /* Sync pulse */
 @keyframes syncpulse {
   0%, 100% { opacity: 1; }
