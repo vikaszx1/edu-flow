@@ -1,8 +1,10 @@
 import { Search, Plus, X, CheckCircle2 } from 'lucide-react'
 import { useState, useEffect, useCallback } from 'react'
+import useCountUp from '../../hooks/useCountUp'
 import Badge from '../../components/ui/Badge'
 import StatCard from '../../components/ui/StatCard'
 import { Card, CardHeader } from '../../components/ui/Card'
+import { SkeletonStatCard, SkeletonTableRow } from '../../components/ui/Skeleton'
 import useStore from '../../store/useStore'
 import { supabase } from '../../lib/supabase'
 
@@ -30,27 +32,75 @@ const inputStyle = { borderColor: 'var(--bdr)', background: 'var(--bg)', color: 
 
 function RegisterModal({ onClose, onRegister }) {
   const [form, setForm] = useState(EMPTY_FORM)
-  const [step, setStep] = useState(1) // 1 = school info, 2 = principal account
-  const [done, setDone] = useState(false)
+  const [step, setStep]     = useState(1)
+  const [done, setDone]     = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError]   = useState('')
 
+  const toast = useStore(s => s.toast)
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
-  const handleSubmit = e => {
+  const handleSubmit = async e => {
     e.preventDefault()
     if (step === 1) { setStep(2); return }
-    onRegister({
-      id: Date.now(),
-      name: form.name,
-      city: form.city,
-      tier: form.tier,
-      students: parseInt(form.approxStudents) || 0,
-      staff: 0,
-      since: new Date().toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }),
-      status: 'Active',
-      syncAt: 'Just now',
-      principalName: form.principalName,
-      principalEmail: form.principalEmail,
+
+    setSaving(true)
+    setError('')
+
+    // 1. Insert school
+    const code = form.name.split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 6)
+    const { data: school, error: schoolErr } = await supabase
+      .from('schools')
+      .insert({ name: form.name, city: form.city, address: form.state, code, is_active: true })
+      .select('id, name, city')
+      .single()
+
+    if (schoolErr) { setError('School save failed: ' + schoolErr.message); setSaving(false); return }
+
+    // 2. Create principal auth account (preserving current superadmin session)
+    const { data: { session: currentSession } } = await supabase.auth.getSession()
+    const tempPassword = `EduFlow@${Math.random().toString(36).slice(2, 8)}`
+
+    const { data: signUpData, error: authErr } = await supabase.auth.signUp({
+      email: form.principalEmail,
+      password: tempPassword,
     })
+
+    // Restore superadmin session immediately
+    if (currentSession) {
+      await supabase.auth.setSession({
+        access_token:  currentSession.access_token,
+        refresh_token: currentSession.refresh_token,
+      })
+    }
+
+    if (authErr) { setError('Principal account failed: ' + authErr.message); setSaving(false); return }
+
+    // 3. Save principal to public.users
+    const { error: userErr } = await supabase.from('users').insert({
+      id:        signUpData.user.id,
+      name:      form.principalName,
+      email:     form.principalEmail,
+      phone:     form.principalPhone || null,
+      role:      'admin',
+      school_id: school.id,
+      is_active: true,
+    })
+
+    if (userErr) { setError('Principal profile failed: ' + userErr.message); setSaving(false); return }
+
+    onRegister({
+      id:       school.id,
+      name:     school.name,
+      city:     school.city,
+      tier:     form.tier,
+      status:   'Active',
+      since:    new Date().toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }),
+      students: 0,
+      staff:    0,
+      syncAt:   'Just now',
+    })
+    setSaving(false)
     setDone(true)
   }
 
@@ -183,9 +233,15 @@ function RegisterModal({ onClose, onRegister }) {
             </div>
           )}
 
-          <div className="flex items-center justify-between mt-5 pt-4 border-t" style={{ borderColor: 'var(--bdr)' }}>
+          {error && (
+            <div className="mt-3 text-[11px] px-3 py-2 rounded-[7px] border" style={{ background: '#fcebeb', borderColor: '#f0b8b8', color: 'var(--red)' }}>
+              {error}
+            </div>
+          )}
+
+          <div className="flex items-center justify-between mt-4 pt-4 border-t" style={{ borderColor: 'var(--bdr)' }}>
             {step === 2
-              ? <button type="button" onClick={() => setStep(1)}
+              ? <button type="button" onClick={() => setStep(1)} disabled={saving}
                   className="px-4 py-2 rounded-[7px] text-[13px] border"
                   style={{ borderColor: 'var(--bdr)', color: 'var(--mut)' }}>
                   ← Back
@@ -196,10 +252,10 @@ function RegisterModal({ onClose, onRegister }) {
                   Cancel
                 </button>
             }
-            <button type="submit"
+            <button type="submit" disabled={saving}
               className="px-5 py-2 rounded-[7px] text-[13px] font-medium text-white"
-              style={{ background: 'var(--pri)' }}>
-              {step === 1 ? 'Next: Principal Account →' : 'Register School'}
+              style={{ background: 'var(--pri)', opacity: saving ? 0.7 : 1 }}>
+              {saving ? 'Saving…' : step === 1 ? 'Next: Principal Account →' : 'Register School'}
             </button>
           </div>
         </form>
@@ -244,6 +300,9 @@ export default function Schools() {
     return () => setTopbarAction(null)
   }, [])
 
+  const totalAnim  = useCountUp(schools.length, !loading)
+  const activeAnim = useCountUp(schools.filter(s => s.status === 'Active').length, !loading)
+
   const filtered = schools.filter(s => {
     const matchSearch = s.name.toLowerCase().includes(search.toLowerCase()) ||
                         s.city.toLowerCase().includes(search.toLowerCase())
@@ -251,8 +310,8 @@ export default function Schools() {
   })
 
   const handleRegister = newSchool => {
-    setSchools(prev => [newSchool, ...prev])
     toast('success', `${newSchool.name} registered successfully`)
+    fetchSchools()
   }
 
   return (
@@ -265,10 +324,12 @@ export default function Schools() {
       )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-[18px]">
-        <StatCard label="Total Schools" value={loading ? '—' : String(schools.length)} sub="registered" />
-        <StatCard label="Active"        value={loading ? '—' : String(schools.filter(s => s.status === 'Active').length)} sub="currently active" />
-        <StatCard label="Inactive"      value={loading ? '—' : String(schools.filter(s => s.status === 'Inactive').length)} sub="disabled" />
-        <StatCard label="Regions"       value={loading ? '—' : String(new Set(schools.map(s => s.city)).size)} sub="cities covered" />
+        {loading ? Array.from({length: 4}).map((_,i) => <SkeletonStatCard key={i} />) : <>
+          <StatCard label="Total Schools" value={String(totalAnim)} sub="registered" className="anim-card" style={{ animationDelay: '0ms' }} />
+          <StatCard label="Active"        value={String(activeAnim)} sub="currently active" className="anim-card" style={{ animationDelay: '60ms' }} />
+          <StatCard label="Inactive"      value={String(schools.filter(s => s.status === 'Inactive').length)} sub="disabled" className="anim-card" style={{ animationDelay: '120ms' }} />
+          <StatCard label="Regions"       value={String(new Set(schools.map(s => s.city)).size)} sub="cities covered" className="anim-card" style={{ animationDelay: '180ms' }} />
+        </>}
       </div>
 
       <Card>
@@ -301,12 +362,14 @@ export default function Schools() {
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 ? (
+            {loading
+              ? Array.from({length: 6}).map((_,i) => <SkeletonTableRow key={i} cols={8} hasAvatar />)
+              : filtered.length === 0 ? (
               <tr><td colSpan={8} className="px-3 py-8 text-center text-[12px]" style={{ color: 'var(--mut)' }}>
                 No schools match your search.
               </td></tr>
-            ) : filtered.map(s => (
-              <tr key={s.id} className="border-b last:border-b-0 hover:bg-[#FAFAF8] cursor-pointer" style={{ borderColor: 'var(--bdr)' }}>
+            ) : filtered.map((s, i) => (
+              <tr key={s.id} className="anim-row border-b last:border-b-0 hover:bg-[#FAFAF8] cursor-pointer" style={{ borderColor: 'var(--bdr)', animationDelay: `${i * 50}ms` }}>
                 <td className="px-3 py-[10px] text-[13px] font-medium max-w-[220px] truncate">{s.name}</td>
                 <td className="px-3 py-[10px] text-[12px]" style={{ color: 'var(--mut)' }}>{s.city}</td>
                 <td className="px-3 py-[10px]">

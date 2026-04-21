@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import Badge from '../components/ui/Badge'
 import { Card, CardHeader, CardBody } from '../components/ui/Card'
+import { SkeletonListRow } from '../components/ui/Skeleton'
 import useStore from '../store/useStore'
 import { supabase } from '../lib/supabase'
 
@@ -104,32 +105,36 @@ export default function Timetable() {
         ))}
       </div>
 
-      {loading ? (
-        <div className="flex items-center justify-center py-16">
-          <div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'var(--pri)', borderTopColor: 'transparent' }} />
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-          {classes.map(cls => {
-            const label = `${cls.grade}-${cls.section}`
-            const periods = slots[cls.id] ?? []
-            return (
-              <Card key={cls.id} className="mb-0">
-                <CardHeader title={`Class ${label}`}>
-                  <Badge variant="blue">{cls.student_count} students</Badge>
-                </CardHeader>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+        {loading
+          ? Array.from({length: 4}).map((_,i) => (
+              <Card key={i} className="mb-0">
+                <CardHeader title={<div className="skeleton h-[13px] w-20" />} />
                 <CardBody className="py-2.5 px-3.5">
-                  {periods.length === 0 ? (
-                    <div className="py-4 text-center text-[12px]" style={{ color: 'var(--lgt)' }}>
-                      No periods on {DAYS[activeDay]}
-                    </div>
-                  ) : periods.map(s => <Period key={s.id} slot={s} />)}
+                  {Array.from({length: 5}).map((_,j) => <SkeletonListRow key={j} hasIcon={false} />)}
                 </CardBody>
               </Card>
-            )
-          })}
-        </div>
-      )}
+            ))
+          : classes.map((cls, i) => {
+              const label = `${cls.grade}-${cls.section}`
+              const periods = slots[cls.id] ?? []
+              return (
+                <Card key={cls.id} className="mb-0 anim-card" style={{ animationDelay: `${i * 60}ms` }}>
+                  <CardHeader title={`Class ${label}`}>
+                    <Badge variant="blue">{cls.student_count} students</Badge>
+                  </CardHeader>
+                  <CardBody className="py-2.5 px-3.5">
+                    {periods.length === 0 ? (
+                      <div className="py-4 text-center text-[12px]" style={{ color: 'var(--lgt)' }}>
+                        No periods on {DAYS[activeDay]}
+                      </div>
+                    ) : periods.map(s => <Period key={s.id} slot={s} />)}
+                  </CardBody>
+                </Card>
+              )
+            })
+        }
+      </div>
     </div>
   )
 }

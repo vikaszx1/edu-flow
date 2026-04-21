@@ -1,8 +1,8 @@
-export function Card({ children, className = '' }) {
+export function Card({ children, className = '', style: extraStyle }) {
   return (
     <div
       className={`rounded-[11px] overflow-hidden border mb-[18px] ${className}`}
-      style={{ background: 'var(--surf)', borderColor: 'var(--bdr)' }}
+      style={{ background: 'var(--surf)', borderColor: 'var(--bdr)', ...extraStyle }}
     >
       {children}
     </div>

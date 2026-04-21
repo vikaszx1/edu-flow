@@ -53,6 +53,20 @@ export function SkeletonListRow({ hasIcon = true }) {
   )
 }
 
+// Staff grid card skeleton
+export function SkeletonStaffCard() {
+  return (
+    <div className="border rounded-[10px] p-4 flex flex-col items-center text-center gap-2"
+      style={{ background: 'var(--surf)', borderColor: 'var(--bdr)' }}>
+      <div className="skeleton w-10 h-10 flex-shrink-0" style={{ borderRadius: '50%' }} />
+      <div className="skeleton h-[13px] w-28" />
+      <div className="skeleton h-[10px] w-20" />
+      <div className="skeleton h-5 w-16" style={{ borderRadius: 99 }} />
+      <div className="skeleton h-[10px] w-24" />
+    </div>
+  )
+}
+
 // Profile card skeleton (student dashboard header)
 export function SkeletonProfile() {
   return (

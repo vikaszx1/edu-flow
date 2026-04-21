@@ -45,6 +45,7 @@ const useStore = create((set, get) => ({
   userRole:    null,   // 'superadmin' | 'admin' | 'teacher' | 'student'
   user:        null,   // { name, initials, role (label) }
   schoolId:    null,   // uuid — null for superadmin
+  schoolName:  null,   // short display name for the topbar
   searchQuery: '',
 
   // ── Router bridge (set by RouteSync in App.jsx) ───────────────────────────
@@ -58,7 +59,7 @@ const useStore = create((set, get) => ({
 
     const { data: profile, error: profileErr } = await supabase
       .from('users')
-      .select('name, role, school_id')
+      .select('name, role, school_id, schools(name, code)')
       .eq('id', data.user.id)
       .single()
 
@@ -71,6 +72,7 @@ const useStore = create((set, get) => ({
       isLoggedIn:  true,
       userRole:    profile.role,
       schoolId:    profile.school_id ?? null,
+      schoolName:  profile.schools?.code || profile.schools?.name || null,
       user:        { name: profile.name, initials: getInitials(profile.name), role: ROLE_LABELS[profile.role] ?? profile.role },
       searchQuery: '',
     })
@@ -81,7 +83,7 @@ const useStore = create((set, get) => ({
   logout: async () => {
     await supabase.auth.signOut()
     set({
-      isLoggedIn: false, userRole: null, user: null, schoolId: null,
+      isLoggedIn: false, userRole: null, user: null, schoolId: null, schoolName: null,
       activePage: 'dashboard', searchQuery: '', authLoading: false,
     })
     get()._navigate?.('/login')
@@ -97,7 +99,7 @@ const useStore = create((set, get) => ({
 
     const { data: profile } = await supabase
       .from('users')
-      .select('name, role, school_id')
+      .select('name, role, school_id, schools(name, code)')
       .eq('id', session.user.id)
       .single()
 
@@ -106,6 +108,7 @@ const useStore = create((set, get) => ({
         isLoggedIn:  true,
         userRole:    profile.role,
         schoolId:    profile.school_id ?? null,
+        schoolName:  profile.schools?.code || profile.schools?.name || null,
         user:        { name: profile.name, initials: getInitials(profile.name), role: ROLE_LABELS[profile.role] ?? profile.role },
         searchQuery: '',
       })

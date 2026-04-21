@@ -1,23 +1,30 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Search, Plus, X, KeyRound, CheckCircle2 } from 'lucide-react'
+import useCountUp from '../../hooks/useCountUp'
 import Badge from '../../components/ui/Badge'
 import Avatar from '../../components/ui/Avatar'
 import StatCard from '../../components/ui/StatCard'
 import { Card, CardHeader } from '../../components/ui/Card'
+import { SkeletonStatCard, SkeletonTableRow } from '../../components/ui/Skeleton'
 import { supabase } from '../../lib/supabase'
 import useStore from '../../store/useStore'
 
-// Mock principals derived from schools list
-const INITIAL_PRINCIPALS = [
-  { id: 1, initials: 'RK', color: 'bl', name: 'Rahul Khanna',     email: 'principal@dps.in',         phone: '98100-11111', school: 'Delhi Public School — Sector 14', schoolId: 1, status: 'Active',   lastLogin: '2 hr ago'   },
-  { id: 2, initials: 'SM', color: 'tl', name: 'Sister Mary',      email: 'principal@stxavier.in',     phone: '98200-22222', school: 'St. Xavier High School',           schoolId: 2, status: 'Active',   lastLogin: '5 hr ago'   },
-  { id: 3, initials: 'VR', color: 'pu', name: 'Vijay Rao',        email: 'principal@kvno3.in',        phone: '97300-33333', school: 'Kendriya Vidyalaya No. 3',         schoolId: 3, status: 'Active',   lastLogin: 'Yesterday'  },
-  { id: 4, initials: 'PA', color: 'co', name: 'Priti Agarwal',    email: 'principal@heritage.in',     phone: '96400-44444', school: 'The Heritage School',              schoolId: 4, status: 'Active',   lastLogin: '1 hr ago'   },
-  { id: 5, initials: 'DS', color: 'am', name: 'Deepak Shah',      email: 'principal@sunrise.in',      phone: '93500-55555', school: 'Sunrise Convent School',           schoolId: 5, status: 'Inactive', lastLogin: '3 days ago' },
-  { id: 6, initials: 'LN', color: 'pk', name: 'Lakshmi Nair',     email: 'principal@greenvalley.in',  phone: '91600-66666', school: 'Green Valley Academy',             schoolId: 6, status: 'Active',   lastLogin: '30 min ago' },
-]
+const COLORS = ['bl','tl','pu','co','am','pk','gn']
+function getInitials(name = '') { return name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase() }
+function getColor(name = '')    { return COLORS[name.charCodeAt(0) % COLORS.length] }
 
-const EMPTY_FORM = { name: '', email: '', phone: '', schoolId: '' }
+function relativeTime(dateStr) {
+  if (!dateStr) return 'Never'
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const mins  = Math.floor(diff / 60000)
+  const hours = Math.floor(diff / 3600000)
+  const days  = Math.floor(diff / 86400000)
+  if (mins  < 60)  return `${mins} min ago`
+  if (hours < 24)  return `${hours} hr ago`
+  if (days  === 1) return 'Yesterday'
+  return `${days} days ago`
+}
+
 const inputCls   = "w-full px-3 py-2 border rounded-[7px] text-[13px] font-dmsans outline-none"
 const inputStyle = { borderColor: 'var(--bdr)', background: 'var(--bg)', color: 'var(--txt)' }
 
@@ -33,25 +40,61 @@ function Field({ label, required, children }) {
 }
 
 function AddPrincipalModal({ schools, onClose, onAdd }) {
-  const [form, setForm] = useState(EMPTY_FORM)
-  const [done, setDone] = useState(false)
+  const [form, setForm]   = useState({ name: '', email: '', phone: '', schoolId: '' })
+  const [done, setDone]   = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
-  const handleSubmit = e => {
+  const handleSubmit = async e => {
     e.preventDefault()
-    const school = schools.find(s => String(s.id) === form.schoolId)
-    onAdd({
-      id: Date.now(),
-      initials: form.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase(),
-      color: 'bl',
-      name: form.name,
+    setSaving(true)
+    setError('')
+
+    // 1. Create principal auth account (preserving current superadmin session)
+    const { data: { session: currentSession } } = await supabase.auth.getSession()
+    const tempPassword = `EduFlow@${Math.random().toString(36).slice(2, 8)}`
+
+    const { data: signUpData, error: authErr } = await supabase.auth.signUp({
       email: form.email,
-      phone: form.phone,
-      school: school?.name ?? '—',
-      schoolId: parseInt(form.schoolId),
-      status: 'Active',
-      lastLogin: 'Never',
+      password: tempPassword,
     })
+
+    // Restore superadmin session immediately
+    if (currentSession) {
+      await supabase.auth.setSession({
+        access_token:  currentSession.access_token,
+        refresh_token: currentSession.refresh_token,
+      })
+    }
+
+    if (authErr) { setError('Auth failed: ' + authErr.message); setSaving(false); return }
+
+    // 2. Save to public.users
+    const { error: userErr } = await supabase.from('users').insert({
+      id:        signUpData.user.id,
+      name:      form.name,
+      email:     form.email,
+      phone:     form.phone || null,
+      role:      'admin',
+      school_id: form.schoolId || null,
+      is_active: true,
+    })
+
+    if (userErr) { setError('Profile save failed: ' + userErr.message); setSaving(false); return }
+
+    const school = schools.find(s => s.id === form.schoolId)
+    onAdd({
+      id:          signUpData.user.id,
+      name:        form.name,
+      email:       form.email,
+      phone:       form.phone,
+      school_name: school?.name ?? '—',
+      school_id:   form.schoolId,
+      is_active:   true,
+      created_at:  new Date().toISOString(),
+    })
+    setSaving(false)
     setDone(true)
   }
 
@@ -99,13 +142,20 @@ function AddPrincipalModal({ schools, onClose, onAdd }) {
               {schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </Field>
+          {error && (
+            <div className="text-[11px] px-3 py-2 rounded-[7px] border" style={{ background: '#fcebeb', borderColor: '#f0b8b8', color: 'var(--red)' }}>
+              {error}
+            </div>
+          )}
           <div className="flex justify-end gap-2 pt-1 border-t" style={{ borderColor: 'var(--bdr)' }}>
-            <button type="button" onClick={onClose}
+            <button type="button" onClick={onClose} disabled={saving}
               className="px-4 py-2 rounded-[7px] text-[13px] border"
               style={{ borderColor: 'var(--bdr)', color: 'var(--mut)' }}>Cancel</button>
-            <button type="submit"
+            <button type="submit" disabled={saving}
               className="px-4 py-2 rounded-[7px] text-[13px] font-medium text-white"
-              style={{ background: 'var(--pri)' }}>Create Account</button>
+              style={{ background: 'var(--pri)', opacity: saving ? 0.7 : 1 }}>
+              {saving ? 'Creating…' : 'Create Account'}
+            </button>
           </div>
         </form>
       </div>
@@ -155,37 +205,56 @@ function ResetModal({ principal, onClose }) {
 }
 
 export default function Principals() {
-  const [principals, setPrincipals] = useState(INITIAL_PRINCIPALS)
-  const [schools,    setSchools]    = useState([])
-  const [search, setSearch]         = useState('')
-  const [showAdd, setShowAdd]       = useState(false)
-  const [resetTarget, setResetTarget] = useState(null)
+  const [principals,   setPrincipals]   = useState([])
+  const [schools,      setSchools]      = useState([])
+  const [loading,      setLoading]      = useState(true)
+  const [search,       setSearch]       = useState('')
+  const [showAdd,      setShowAdd]      = useState(false)
+  const [resetTarget,  setResetTarget]  = useState(null)
 
   const setTopbarAction = useStore(s => s.setTopbarAction)
   const toast           = useStore(s => s.toast)
   const showConfirm     = useStore(s => s.showConfirm)
 
-  useEffect(() => {
-    setTopbarAction(() => setShowAdd(true))
-    return () => setTopbarAction(null)
+  const fetchPrincipals = useCallback(async () => {
+    setLoading(true)
+    const { data } = await supabase
+      .from('vw_principals')
+      .select('id, name, email, phone, is_active, created_at, school_id, school_name')
+      .order('name')
+    setPrincipals((data ?? []).map(p => ({
+      ...p,
+      initials: getInitials(p.name),
+      color:    getColor(p.name),
+    })))
+    setLoading(false)
   }, [])
+
+  useEffect(() => { fetchPrincipals() }, [fetchPrincipals])
 
   useEffect(() => {
     supabase.from('schools').select('id, name').order('name')
       .then(({ data }) => setSchools(data ?? []))
   }, [])
 
+  useEffect(() => {
+    setTopbarAction(() => setShowAdd(true))
+    return () => setTopbarAction(null)
+  }, [])
+
   const filtered = principals.filter(p =>
     p.name.toLowerCase().includes(search.toLowerCase()) ||
     p.email.toLowerCase().includes(search.toLowerCase()) ||
-    p.school.toLowerCase().includes(search.toLowerCase())
+    (p.school_name ?? '').toLowerCase().includes(search.toLowerCase())
   )
 
-  const active   = principals.filter(p => p.status === 'Active').length
-  const inactive = principals.filter(p => p.status === 'Inactive').length
+  const active   = principals.filter(p => p.is_active).length
+  const inactive = principals.filter(p => !p.is_active).length
+  const totalAnim  = useCountUp(principals.length, !loading)
+  const activeAnim = useCountUp(active, !loading)
 
-  const toggleStatus = async (p) => {
-    const isSuspending = p.status === 'Active'
+  const toggleStatus = async p => {
+    const isSuspending = p.is_active
     if (isSuspending) {
       const ok = await showConfirm({
         title: 'Suspend Account',
@@ -195,23 +264,27 @@ export default function Principals() {
       })
       if (!ok) return
     }
-    setPrincipals(prev => prev.map(x => x.id === p.id
-      ? { ...x, status: isSuspending ? 'Inactive' : 'Active' }
-      : x
-    ))
+    const { error } = await supabase
+      .from('users')
+      .update({ is_active: !isSuspending })
+      .eq('id', p.id)
+    if (error) { toast('error', 'Failed: ' + error.message); return }
+    setPrincipals(prev => prev.map(x => x.id === p.id ? { ...x, is_active: !isSuspending } : x))
     toast(isSuspending ? 'warning' : 'success',
       isSuspending ? `${p.name}'s account suspended` : `${p.name}'s account activated`)
   }
 
   return (
     <div>
-      {showAdd   && <AddPrincipalModal schools={schools} onClose={() => setShowAdd(false)}   onAdd={p => setPrincipals(prev => [p, ...prev])} />}
-      {resetTarget && <ResetModal principal={resetTarget} onClose={() => setResetTarget(null)} />}
+      {showAdd      && <AddPrincipalModal schools={schools} onClose={() => setShowAdd(false)} onAdd={p => setPrincipals(prev => [{ ...p, initials: getInitials(p.name), color: getColor(p.name) }, ...prev])} />}
+      {resetTarget  && <ResetModal principal={resetTarget} onClose={() => setResetTarget(null)} />}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-[18px]">
-        <StatCard label="Total Principals" value={String(principals.length)} sub="across all schools" />
-        <StatCard label="Active"           value={String(active)}   upText={`${active} accounts`}    sub="currently active" />
-        <StatCard label="Inactive"         value={String(inactive)} downText={inactive > 0 ? 'Review needed' : ''} sub="suspended accounts" />
+        {loading ? Array.from({length: 3}).map((_,i) => <SkeletonStatCard key={i} />) : <>
+          <StatCard label="Total Principals" value={String(totalAnim)} sub="across all schools" className="anim-card" style={{ animationDelay: '0ms' }} />
+          <StatCard label="Active"           value={String(activeAnim)} upText={`${active} accounts`} sub="currently active" className="anim-card" style={{ animationDelay: '60ms' }} />
+          <StatCard label="Inactive"         value={String(inactive)} downText={inactive > 0 ? 'Review needed' : ''} sub="suspended accounts" className="anim-card" style={{ animationDelay: '120ms' }} />
+        </>}
       </div>
 
       <Card>
@@ -232,57 +305,63 @@ export default function Principals() {
         </div>
 
         <div className="overflow-x-auto">
-        <table className="w-full border-collapse">
-          <thead>
-            <tr>
-              {['Principal', 'School', 'Email', 'Phone', 'Last Login', 'Status', 'Actions'].map(h => (
-                <th key={h} className="text-[10px] uppercase tracking-[0.5px] font-medium text-left px-3 pb-2 pt-3 border-b"
-                  style={{ color: 'var(--mut)', borderColor: 'var(--bdr)' }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map(p => (
-              <tr key={p.id} className="border-b last:border-b-0 hover:bg-[#FAFAF8]" style={{ borderColor: 'var(--bdr)' }}>
-                <td className="px-3 py-[10px]">
-                  <div className="flex items-center gap-2">
-                    <Avatar initials={p.initials} colorKey={p.color} size="sm" />
-                    <span className="text-[13px] font-medium">{p.name}</span>
-                  </div>
-                </td>
-                <td className="px-3 py-[10px] text-[11px] max-w-[180px] truncate" style={{ color: 'var(--mut)' }}>{p.school}</td>
-                <td className="px-3 py-[10px] text-[12px]">{p.email}</td>
-                <td className="px-3 py-[10px] text-[12px]" style={{ color: 'var(--mut)' }}>{p.phone}</td>
-                <td className="px-3 py-[10px] text-[11px]" style={{ color: 'var(--lgt)' }}>{p.lastLogin}</td>
-                <td className="px-3 py-[10px]">
-                  <Badge variant={p.status === 'Active' ? 'green' : 'red'}>{p.status}</Badge>
-                </td>
-                <td className="px-3 py-[10px]">
-                  <div className="flex items-center gap-2">
-                    <button onClick={() => setResetTarget(p)}
-                      className="flex items-center gap-1 px-2 py-1 rounded-[5px] text-[11px] border"
-                      style={{ borderColor: 'var(--bdr)', color: 'var(--mut)' }}>
-                      <KeyRound size={11} /> Reset pwd
-                    </button>
-                    <button onClick={() => toggleStatus(p)}
-                      className="px-2 py-1 rounded-[5px] text-[11px] border"
-                      style={{
-                        borderColor: p.status === 'Active' ? '#f0b8b8' : '#9fe1cb',
-                        color:       p.status === 'Active' ? 'var(--red)' : 'var(--teal)',
-                      }}>
-                      {p.status === 'Active' ? 'Suspend' : 'Activate'}
-                    </button>
-                  </div>
-                </td>
+          <table className="w-full border-collapse">
+            <thead>
+              <tr>
+                {['Principal', 'School', 'Email', 'Phone', 'Joined', 'Status', 'Actions'].map(h => (
+                  <th key={h} className="text-[10px] uppercase tracking-[0.5px] font-medium text-left px-3 pb-2 pt-3 border-b"
+                    style={{ color: 'var(--mut)', borderColor: 'var(--bdr)' }}>{h}</th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
-
+            </thead>
+            <tbody>
+              {loading
+                ? Array.from({length: 6}).map((_,i) => <SkeletonTableRow key={i} cols={7} hasAvatar />)
+                : filtered.map((p, i) => (
+                <tr key={p.id} className="anim-row border-b last:border-b-0 hover:bg-[#FAFAF8]" style={{ borderColor: 'var(--bdr)', animationDelay: `${i * 50}ms` }}>
+                  <td className="px-3 py-[10px]">
+                    <div className="flex items-center gap-2">
+                      <Avatar initials={p.initials} colorKey={p.color} size="sm" />
+                      <span className="text-[13px] font-medium">{p.name}</span>
+                    </div>
+                  </td>
+                  <td className="px-3 py-[10px] text-[11px] max-w-[180px] truncate" style={{ color: 'var(--mut)' }}>{p.school_name}</td>
+                  <td className="px-3 py-[10px] text-[12px]">{p.email}</td>
+                  <td className="px-3 py-[10px] text-[12px]" style={{ color: 'var(--mut)' }}>{p.phone ?? '—'}</td>
+                  <td className="px-3 py-[10px] text-[11px]" style={{ color: 'var(--lgt)' }}>{relativeTime(p.created_at)}</td>
+                  <td className="px-3 py-[10px]">
+                    <Badge variant={p.is_active ? 'green' : 'red'}>{p.is_active ? 'Active' : 'Inactive'}</Badge>
+                  </td>
+                  <td className="px-3 py-[10px]">
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => setResetTarget(p)}
+                        className="flex items-center gap-1 px-2 py-1 rounded-[5px] text-[11px] border"
+                        style={{ borderColor: 'var(--bdr)', color: 'var(--mut)' }}>
+                        <KeyRound size={11} /> Reset pwd
+                      </button>
+                      <button onClick={() => toggleStatus(p)}
+                        className="px-2 py-1 rounded-[5px] text-[11px] border"
+                        style={{
+                          borderColor: p.is_active ? '#f0b8b8' : '#9fe1cb',
+                          color:       p.is_active ? 'var(--red)' : 'var(--teal)',
+                        }}>
+                        {p.is_active ? 'Suspend' : 'Activate'}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {!loading && filtered.length === 0 && (
+                <tr><td colSpan={7} className="px-3 py-8 text-center text-[12px]" style={{ color: 'var(--mut)' }}>No principals found</td></tr>
+              )}
+            </tbody>
+          </table>
         </div>
-        <div className="px-4 py-2.5 text-[11px] border-t" style={{ color: 'var(--mut)', borderColor: 'var(--bdr)' }}>
-          Showing {filtered.length} of {principals.length} principals
-        </div>
+        {!loading && filtered.length > 0 && (
+          <div className="px-4 py-2.5 text-[11px] border-t" style={{ color: 'var(--mut)', borderColor: 'var(--bdr)' }}>
+            Showing {filtered.length} of {principals.length} principals
+          </div>
+        )}
       </Card>
     </div>
   )

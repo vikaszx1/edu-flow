@@ -4,6 +4,7 @@ import { Card, CardHeader, CardBody } from '../components/ui/Card'
 import Toggle from '../components/ui/Toggle'
 import Button from '../components/ui/Button'
 import useStore from '../store/useStore'
+import { supabase } from '../lib/supabase'
 
 function SettingRow({ label, sub, right }) {
   return (
@@ -20,13 +21,7 @@ function SettingRow({ label, sub, right }) {
 export default function Settings() {
   const setTopbarAction = useStore(s => s.setTopbarAction)
   const toast           = useStore(s => s.toast)
-
-  const handleSave = () => toast('success', 'Settings saved successfully')
-
-  useEffect(() => {
-    setTopbarAction(handleSave)
-    return () => setTopbarAction(null)
-  }, [])
+  const schoolId        = useStore(s => s.schoolId)
 
   const [sync, setSync] = useState({
     autoSync: true,
@@ -40,11 +35,33 @@ export default function Settings() {
     newEnrollments: false,
   })
   const [platform, setPlatform] = useState({ shortcuts: true, touchMode: false })
-  const [school, setSchool] = useState({
-    name: 'Delhi Public School — Sector 14',
-    year: '2025–2026',
-    board: 'CBSE',
-  })
+  const [school, setSchool] = useState({ name: '', year: '', board: 'CBSE' })
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (!schoolId) return
+    supabase.from('schools').select('name, academic_year, board').eq('id', schoolId).single()
+      .then(({ data }) => {
+        if (data) setSchool({ name: data.name ?? '', year: data.academic_year ?? '', board: data.board ?? 'CBSE' })
+      })
+  }, [schoolId])
+
+  const handleSave = async () => {
+    if (schoolId) {
+      setSaving(true)
+      const { error } = await supabase.from('schools')
+        .update({ name: school.name, academic_year: school.year, board: school.board })
+        .eq('id', schoolId)
+      setSaving(false)
+      if (error) { toast('error', 'Failed to save: ' + error.message); return }
+    }
+    toast('success', 'Settings saved successfully')
+  }
+
+  useEffect(() => {
+    setTopbarAction(handleSave)
+    return () => setTopbarAction(null)
+  }, [school, schoolId])
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -102,7 +119,7 @@ export default function Settings() {
                 style={{ borderColor: 'var(--bdr)', background: 'var(--bg)', color: 'var(--txt)' }}
               />
             </div>
-            <div>
+            <div className="mb-3">
               <div className="text-[11px] mb-1" style={{ color: 'var(--mut)' }}>Board</div>
               <select
                 value={school.board}
@@ -115,6 +132,9 @@ export default function Settings() {
                 <option>State Board</option>
               </select>
             </div>
+            <Button variant="primary" className="w-full text-[12px]" disabled={saving} onClick={handleSave}>
+              {saving ? 'Saving…' : 'Save School Info'}
+            </Button>
           </CardBody>
         </Card>
       </div>

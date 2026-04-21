@@ -3,6 +3,7 @@ import Avatar from '../components/ui/Avatar'
 import StatCard from '../components/ui/StatCard'
 import { Card, CardHeader } from '../components/ui/Card'
 import Button from '../components/ui/Button'
+import { SkeletonStatCard, SkeletonTableRow } from '../components/ui/Skeleton'
 import useStore from '../store/useStore'
 import { supabase } from '../lib/supabase'
 
@@ -55,8 +56,8 @@ function AttTable({ records, setStatus, setRemark, colLabel }) {
           </tr>
         </thead>
         <tbody>
-          {records.map(r => (
-            <tr key={r.id} className="border-b last:border-b-0 hover:bg-[#FAFAF8]" style={{ borderColor: 'var(--bdr)' }}>
+          {records.map((r, i) => (
+            <tr key={r.id} className="anim-row border-b last:border-b-0 hover:bg-[#FAFAF8]" style={{ borderColor: 'var(--bdr)', animationDelay: `${i * 40}ms` }}>
               <td className="px-2.5 py-[10px] text-[12px]">
                 <div className="flex items-center gap-2">
                   <Avatar initials={r.initials} colorKey={r.color} size="sm" />
@@ -309,14 +310,16 @@ export default function Attendance() {
           </div>
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-[18px]">
-            <StatCard label="Present" value={loading ? '—' : String(sPresent)}
-              upText={studentRecords.length ? `${Math.round((sPresent/studentRecords.length)*100)}%` : ''}
-              sub={`of ${studentRecords.length} students`} />
-            <StatCard label="Absent" value={loading ? '—' : String(sAbsent)}
-              downText={sAbsent > 0 ? `${((sAbsent/studentRecords.length)*100).toFixed(1)}%` : ''}
-              sub="today" />
-            <StatCard label="Late Arrivals" value={loading ? '—' : String(sLate)} sub="today" />
-            <StatCard label="Total Students" value={loading ? '—' : String(studentRecords.length)} sub={clsLabel} />
+            {loading ? Array.from({length: 4}).map((_,i) => <SkeletonStatCard key={i} />) : <>
+              <StatCard label="Present" value={String(sPresent)}
+                upText={studentRecords.length ? `${Math.round((sPresent/studentRecords.length)*100)}%` : ''}
+                sub={`of ${studentRecords.length} students`} className="anim-card" style={{ animationDelay: '0ms' }} />
+              <StatCard label="Absent" value={String(sAbsent)}
+                downText={sAbsent > 0 ? `${((sAbsent/studentRecords.length)*100).toFixed(1)}%` : ''}
+                sub="today" className="anim-card" style={{ animationDelay: '60ms' }} />
+              <StatCard label="Late Arrivals" value={String(sLate)} sub="today" className="anim-card" style={{ animationDelay: '120ms' }} />
+              <StatCard label="Total Students" value={String(studentRecords.length)} sub={clsLabel} className="anim-card" style={{ animationDelay: '180ms' }} />
+            </>}
           </div>
 
           <Card>
@@ -332,9 +335,20 @@ export default function Attendance() {
             </CardHeader>
 
             {loading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin"
-                  style={{ borderColor: 'var(--pri)', borderTopColor: 'transparent' }} />
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr>
+                      {['Student', 'Roll No.', 'Status', 'Remarks'].map(h => (
+                        <th key={h} className="text-[10px] uppercase tracking-[0.5px] font-medium text-left px-2.5 pb-2 pt-3 border-b"
+                          style={{ color: 'var(--mut)', borderColor: 'var(--bdr)' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Array.from({length: 8}).map((_,i) => <SkeletonTableRow key={i} cols={4} hasAvatar />)}
+                  </tbody>
+                </table>
               </div>
             ) : (
               <AttTable
@@ -354,11 +368,11 @@ export default function Attendance() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-[18px]">
             <StatCard label="Staff Present" value={String(stPresent)}
               upText={staffRecords.length ? `${Math.round((stPresent/staffRecords.length)*100)}%` : ''}
-              sub="today" />
+              sub="today" className="anim-card" style={{ animationDelay: '0ms' }} />
             <StatCard label="Absent" value={String(stAbsent)}
-              downText={stAbsent > 0 ? 'On leave / absent' : ''} sub="today" />
-            <StatCard label="Late Arrivals" value={String(stLate)} sub="after 9:00 AM" />
-            <StatCard label="Total Staff" value={String(staffRecords.length)} sub="teaching + admin" />
+              downText={stAbsent > 0 ? 'On leave / absent' : ''} sub="today" className="anim-card" style={{ animationDelay: '60ms' }} />
+            <StatCard label="Late Arrivals" value={String(stLate)} sub="after 9:00 AM" className="anim-card" style={{ animationDelay: '120ms' }} />
+            <StatCard label="Total Staff" value={String(staffRecords.length)} sub="teaching + admin" className="anim-card" style={{ animationDelay: '180ms' }} />
           </div>
 
           <Card>

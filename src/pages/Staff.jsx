@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import { X, BookOpen, Mail } from 'lucide-react'
+import useCountUp from '../hooks/useCountUp'
 import Avatar from '../components/ui/Avatar'
 import Badge, { statusVariant } from '../components/ui/Badge'
 import StatCard from '../components/ui/StatCard'
 import Button from '../components/ui/Button'
+import { SkeletonStatCard, SkeletonStaffCard } from '../components/ui/Skeleton'
 import useStore from '../store/useStore'
 import { supabase } from '../lib/supabase'
 
@@ -73,28 +75,62 @@ function StaffDetailModal({ member: s, onClose }) {
 function AddStaffModal({ onClose, onAdded }) {
   const schoolId = useStore(s => s.schoolId)
   const toast    = useStore(s => s.toast)
-  const [form, setForm] = useState({ name:'', subject: SUBJECTS[0], exp:'', status:'Active' })
+  const [form, setForm] = useState({ name:'', email:'', subject: SUBJECTS[0], exp:'', status:'Active' })
   const [saving, setSaving] = useState(false)
+  const [error,  setError]  = useState('')
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
   const handleSubmit = async e => {
     e.preventDefault()
     setSaving(true)
+    setError('')
+
     const empId = 'EMP-' + Date.now().toString().slice(-5)
     const joinDate = new Date()
     joinDate.setFullYear(joinDate.getFullYear() - (parseInt(form.exp) || 0))
 
-    const { error } = await supabase.from('staff').insert({
+    // 1. Preserve current session before signUp replaces it
+    const { data: { session: currentSession } } = await supabase.auth.getSession()
+    const tempPassword = `EduFlow@${Math.random().toString(36).slice(2, 8)}`
+    const { data: signUpData, error: authErr } = await supabase.auth.signUp({
+      email: form.email, password: tempPassword,
+    })
+    if (currentSession) {
+      await supabase.auth.setSession({
+        access_token:  currentSession.access_token,
+        refresh_token: currentSession.refresh_token,
+      })
+    }
+    if (authErr) { setError(authErr.message); setSaving(false); return }
+
+    const userId = signUpData.user.id
+
+    // 2. Insert into public.users as teacher
+    const { error: userErr } = await supabase.from('users').insert({
+      id:        userId,
+      name:      form.name,
+      email:     form.email,
+      role:      'teacher',
+      school_id: schoolId,
+      is_active: form.status === 'Active',
+    })
+    if (userErr) { setError(userErr.message); setSaving(false); return }
+
+    // 3. Insert into staff table linked to the user
+    const { error: staffErr } = await supabase.from('staff').insert({
       school_id:   schoolId,
+      user_id:     userId,
       employee_id: empId,
       name:        form.name,
+      email:       form.email,
       department:  form.subject,
       designation: form.subject + ' Teacher',
       join_date:   joinDate.toISOString().slice(0,10),
       is_active:   form.status === 'Active',
     })
     setSaving(false)
-    if (error) { toast('error', 'Failed to add staff: ' + error.message); return }
+    if (staffErr) { setError(staffErr.message); return }
+
     toast('success', `${form.name} added to staff`)
     onAdded()
     onClose()
@@ -108,10 +144,22 @@ function AddStaffModal({ onClose, onAdded }) {
           <button onClick={onClose} style={{ color: 'var(--lgt)' }}><X size={16} /></button>
         </div>
         <form onSubmit={handleSubmit} className="p-5 flex flex-col gap-4">
-          <div>
-            <label className="block text-[11px] font-medium mb-1" style={{ color: 'var(--mut)' }}>Full Name *</label>
-            <input className={inputCls} style={inputStyle} required value={form.name}
-              placeholder="e.g. Mr. Sanjay Gupta" onChange={e => set('name', e.target.value)} />
+          {error && (
+            <div className="text-[12px] px-3 py-2 rounded-[7px]" style={{ background: '#fef2f2', color: 'var(--red)' }}>
+              {error}
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2">
+              <label className="block text-[11px] font-medium mb-1" style={{ color: 'var(--mut)' }}>Full Name *</label>
+              <input className={inputCls} style={inputStyle} required value={form.name}
+                placeholder="e.g. Mr. Sanjay Gupta" onChange={e => set('name', e.target.value)} />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-[11px] font-medium mb-1" style={{ color: 'var(--mut)' }}>Email * <span style={{ color: 'var(--lgt)', fontWeight: 400 }}>(used for login)</span></label>
+              <input className={inputCls} style={inputStyle} required type="email" value={form.email}
+                placeholder="teacher@school.in" onChange={e => set('email', e.target.value)} />
+            </div>
           </div>
           <div>
             <label className="block text-[11px] font-medium mb-1" style={{ color: 'var(--mut)' }}>Subject *</label>
@@ -133,7 +181,7 @@ function AddStaffModal({ onClose, onAdded }) {
             </div>
           </div>
           <div className="flex justify-end gap-2 pt-1 border-t" style={{ borderColor: 'var(--bdr)' }}>
-            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+            <Button type="button" variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
             <Button type="submit" variant="primary" disabled={saving}>{saving ? 'Saving…' : 'Add Staff'}</Button>
           </div>
         </form>
@@ -172,8 +220,11 @@ export default function Staff() {
     return () => setTopbarAction(null)
   }, [userRole])
 
-  const active  = staff.filter(s => s.status === 'Active').length
-  const onLeave = staff.filter(s => s.status === 'On Leave').length
+  const active      = staff.filter(s => s.status === 'Active').length
+  const onLeave     = staff.filter(s => s.status === 'On Leave').length
+  const totalAnim   = useCountUp(staff.length, !loading)
+  const activeAnim  = useCountUp(active, !loading)
+  const leaveAnim   = useCountUp(onLeave, !loading)
 
   return (
     <div>
@@ -181,21 +232,21 @@ export default function Staff() {
       {showAdd    && <AddStaffModal onClose={() => setShowAdd(false)} onAdded={fetchStaff} />}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-[18px]">
-        <StatCard label="Total Staff"     value={loading ? '—' : String(staff.length)} sub="Teaching + Admin" />
-        <StatCard label="Active"          value={loading ? '—' : String(active)}       sub="Present today" />
-        <StatCard label="On Leave"        value={loading ? '—' : String(onLeave)}      sub="Today" />
+        {loading ? Array.from({length: 3}).map((_,i) => <SkeletonStatCard key={i} />) : <>
+          <StatCard label="Total Staff" value={String(totalAnim)}  sub="Teaching + Admin" className="anim-card" style={{ animationDelay: '0ms' }} />
+          <StatCard label="Active"      value={String(activeAnim)} sub="Present today"    className="anim-card" style={{ animationDelay: '60ms' }} />
+          <StatCard label="On Leave"    value={String(leaveAnim)}  sub="Today"            className="anim-card" style={{ animationDelay: '120ms' }} />
+        </>}
       </div>
 
-      {loading ? (
-        <div className="flex items-center justify-center py-16">
-          <div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'var(--pri)', borderTopColor: 'transparent' }} />
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-          {staff.map(s => (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+        {loading
+          ? Array.from({length: 6}).map((_,i) => <SkeletonStaffCard key={i} />)
+          : (<>
+          {staff.map((s, i) => (
             <div key={s.id} onClick={() => setViewMember(s)}
-              className="border rounded-[10px] p-4 flex flex-col items-center text-center gap-2 cursor-pointer transition-shadow hover:shadow-md"
-              style={{ background: 'var(--surf)', borderColor: 'var(--bdr)' }}>
+              className="anim-card border rounded-[10px] p-4 flex flex-col items-center text-center gap-2 cursor-pointer transition-shadow hover:shadow-md"
+              style={{ background: 'var(--surf)', borderColor: 'var(--bdr)', animationDelay: `${i * 50}ms` }}>
               <Avatar initials={s.initials} colorKey={s.color.replace('av-','')} size="lg" />
               <div className="font-medium text-[13px]">{s.name}</div>
               <div className="text-[11px]" style={{ color: 'var(--mut)' }}>{s.subject}</div>
@@ -208,8 +259,8 @@ export default function Staff() {
           {staff.length === 0 && (
             <div className="col-span-3 py-12 text-center text-[12px]" style={{ color: 'var(--mut)' }}>No staff records found</div>
           )}
-        </div>
-      )}
+        </>)}
+      </div>
     </div>
   )
 }

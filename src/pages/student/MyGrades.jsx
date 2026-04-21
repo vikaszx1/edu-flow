@@ -3,6 +3,7 @@ import { Download } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
 import StatCard from '../../components/ui/StatCard'
 import { Card, CardHeader } from '../../components/ui/Card'
+import { SkeletonProfile, SkeletonStatCard, SkeletonTableRow } from '../../components/ui/Skeleton'
 import useStore from '../../store/useStore'
 import { supabase } from '../../lib/supabase'
 
@@ -103,72 +104,70 @@ export default function MyGrades() {
   return (
     <div>
       {/* Header banner */}
-      <div className="rounded-[11px] p-4 mb-4 flex flex-wrap items-center gap-4 border"
-        style={{ background: 'var(--surf)', borderColor: 'var(--bdr)' }}>
-        <div>
-          <div className="font-syne text-[16px] font-semibold">
-            {loading ? '—' : (student?.name ?? '—')}
+      {loading ? <SkeletonProfile /> : (
+        <div className="rounded-[11px] p-4 mb-4 flex flex-wrap items-center gap-4 border"
+          style={{ background: 'var(--surf)', borderColor: 'var(--bdr)' }}>
+          <div>
+            <div className="font-syne text-[16px] font-semibold">{student?.name ?? '—'}</div>
+            <div className="text-[12px]" style={{ color: 'var(--mut)' }}>
+              {clsLabel ? `Class ${clsLabel} · ` : ''}Roll #{student?.roll_number ?? '—'} · AY 2025–26
+            </div>
           </div>
-          <div className="text-[12px]" style={{ color: 'var(--mut)' }}>
-            {clsLabel ? `Class ${clsLabel} · ` : ''}Roll #{student?.roll_number ?? '—'} · AY 2025–26
-          </div>
+          <button onClick={handleDownload}
+            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] text-[12px] font-medium text-white"
+            style={{ background: 'var(--pri)' }}>
+            <Download size={13} /> Download Report Card
+          </button>
         </div>
-        <button onClick={handleDownload}
-          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] text-[12px] font-medium text-white"
-          style={{ background: 'var(--pri)' }}>
-          <Download size={13} /> Download Report Card
-        </button>
-      </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-[18px]">
-        <StatCard label="Overall Average" value={loading ? '—' : `${avg}%`}
-          upText={avg >= 80 ? 'Top performer' : ''} sub="all exams" />
-        <StatCard label="Best Subject" value={bestRow?.subject?.split(' ')[0] ?? '—'}
-          upText={bestRow ? (() => {
-            const sc = Object.values(bestRow.marks)
-            return sc.length ? `${Math.round(sc.reduce((a,m)=>a+(m.obtained/m.max)*100,0)/sc.length)}%` : ''
-          })() : ''} sub="average" />
-        <StatCard label="Exams Recorded" value={loading ? '—' : String(new Set(rows.flatMap(r=>Object.keys(r.marks))).size)}
-          sub="exam types" />
-        <StatCard label="Grade" value={loading ? '—' : gradeLabel(avg).label}
-          upText={avg >= 90 ? 'Excellent' : avg >= 75 ? 'Good' : 'Needs work'} sub="cumulative" />
+        {loading ? Array.from({length: 4}).map((_,i) => <SkeletonStatCard key={i} />) : <>
+          <StatCard label="Overall Average" value={`${avg}%`}
+            upText={avg >= 80 ? 'Top performer' : ''} sub="all exams" className="anim-card" style={{ animationDelay: '0ms' }} />
+          <StatCard label="Best Subject" value={bestRow?.subject?.split(' ')[0] ?? '—'}
+            upText={bestRow ? (() => {
+              const sc = Object.values(bestRow.marks)
+              return sc.length ? `${Math.round(sc.reduce((a,m)=>a+(m.obtained/m.max)*100,0)/sc.length)}%` : ''
+            })() : ''} sub="average" className="anim-card" style={{ animationDelay: '60ms' }} />
+          <StatCard label="Exams Recorded" value={String(new Set(rows.flatMap(r=>Object.keys(r.marks))).size)}
+            sub="exam types" className="anim-card" style={{ animationDelay: '120ms' }} />
+          <StatCard label="Grade" value={gradeLabel(avg).label}
+            upText={avg >= 90 ? 'Excellent' : avg >= 75 ? 'Good' : 'Needs work'} sub="cumulative" className="anim-card" style={{ animationDelay: '180ms' }} />
+        </>}
       </div>
 
       {/* Marks table */}
       <Card>
         <CardHeader title="Subject-wise Performance" />
-        {loading ? (
-          <div className="flex items-center justify-center py-10">
-            <div className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin"
-              style={{ borderColor: 'var(--pri)', borderTopColor: 'transparent' }} />
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr>
-                  {['Subject', ...EXAM_TYPES, 'Avg', 'Grade'].map(h => (
-                    <th key={h} className="text-[10px] uppercase tracking-[0.5px] font-medium text-left px-3 pb-2 pt-3 border-b"
-                      style={{ color: 'var(--mut)', borderColor: 'var(--bdr)' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {rows.length === 0 ? (
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr>
+                {['Subject', ...EXAM_TYPES, 'Avg', 'Grade'].map(h => (
+                  <th key={h} className="text-[10px] uppercase tracking-[0.5px] font-medium text-left px-3 pb-2 pt-3 border-b"
+                    style={{ color: 'var(--mut)', borderColor: 'var(--bdr)' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {loading
+                ? Array.from({length: 6}).map((_,i) => <SkeletonTableRow key={i} cols={6} />)
+                : rows.length === 0 ? (
                   <tr>
                     <td colSpan={EXAM_TYPES.length + 3} className="px-3 py-10 text-center text-[12px]"
                       style={{ color: 'var(--lgt)' }}>No marks recorded yet</td>
                   </tr>
-                ) : rows.map(row => {
+                ) : rows.map((row, i) => {
                   const scores = Object.values(row.marks)
                   const rowAvg = scores.length
                     ? Math.round(scores.reduce((a, m) => a + (m.obtained / m.max) * 100, 0) / scores.length)
                     : null
                   const g = rowAvg !== null ? gradeLabel(rowAvg) : null
                   return (
-                    <tr key={row.subject} className="border-b last:border-b-0 hover:bg-[#FAFAF8]"
-                      style={{ borderColor: 'var(--bdr)' }}>
+                    <tr key={row.subject} className="anim-row border-b last:border-b-0 hover:bg-[#FAFAF8]"
+                      style={{ borderColor: 'var(--bdr)', animationDelay: `${i * 55}ms` }}>
                       <td className="px-3 py-[10px] text-[13px] font-medium">{row.subject}</td>
                       {EXAM_TYPES.map(et => (
                         <td key={et} className="px-3 py-[10px]">
@@ -187,10 +186,9 @@ export default function MyGrades() {
                     </tr>
                   )
                 })}
-              </tbody>
-            </table>
-          </div>
-        )}
+            </tbody>
+          </table>
+        </div>
       </Card>
 
       {/* Grade legend */}

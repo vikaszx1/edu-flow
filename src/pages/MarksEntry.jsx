@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import Avatar from '../components/ui/Avatar'
 import { Card, CardHeader } from '../components/ui/Card'
 import Button from '../components/ui/Button'
+import Skeleton from '../components/ui/Skeleton'
 import useStore from '../store/useStore'
 import { supabase } from '../lib/supabase'
 
@@ -188,9 +189,19 @@ export default function MarksEntry() {
         </CardHeader>
 
         {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin"
-              style={{ borderColor: 'var(--pri)', borderTopColor: 'transparent' }} />
+          <div className="p-4">
+            <div className="flex gap-1.5 pb-2 border-b mb-1" style={{ borderColor: 'var(--bdr)' }}>
+              <Skeleton w={150} h={11} />
+              {Array.from({length: 4}).map((_,i) => <Skeleton key={i} w={60} h={11} />)}
+              <Skeleton w={70} h={11} />
+            </div>
+            {Array.from({length: 8}).map((_,i) => (
+              <div key={i} className="flex gap-1.5 py-2 border-t items-center" style={{ borderColor: 'var(--bdr)' }}>
+                <Skeleton w={150} h={26} />
+                {Array.from({length: 4}).map((_,j) => <Skeleton key={j} w={60} h={26} />)}
+                <Skeleton w={70} h={16} />
+              </div>
+            ))}
           </div>
         ) : (
           <div className="p-4 overflow-x-auto">
@@ -219,17 +230,18 @@ export default function MarksEntry() {
               </div>
             )}
 
-            {rows.map(r => {
+            {rows.map((r, i) => {
               const total = calcTotal(r.marks)
               const tc    = totalColor(total, maxTotal)
               return (
-                <div key={r.id} className="grid py-2 border-t"
+                <div key={r.id} className="anim-row grid py-2 border-t"
                   style={{
                     gridTemplateColumns: `150px repeat(${subjects.length},1fr) 70px`,
                     gap: '6px',
                     alignItems: 'center',
                     borderColor: 'var(--bdr)',
                     minWidth: 500,
+                    animationDelay: `${i * 40}ms`,
                   }}>
                   <div className="flex items-center gap-[7px] text-[12px]">
                     <Avatar initials={r.initials} colorKey={r.color} size="sm" />

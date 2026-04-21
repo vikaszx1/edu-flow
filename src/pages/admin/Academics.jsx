@@ -5,6 +5,7 @@ import Badge from '../../components/ui/Badge'
 import StatCard from '../../components/ui/StatCard'
 import { Card, CardHeader, CardBody } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
+import { SkeletonStatCard, SkeletonTableRow } from '../../components/ui/Skeleton'
 import useStore from '../../store/useStore'
 import { supabase } from '../../lib/supabase'
 
@@ -64,7 +65,7 @@ function ClassModal({ initial, onClose, onSave, staffList = [] }) {
             <select className={inputCls} style={inputStyle} value={form.classTeacher}
               onChange={e => set('classTeacher', e.target.value)}>
               <option value="">— Assign later —</option>
-              {staffList.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              {staffList.filter(s => s.user_id).map(s => <option key={s.id} value={s.user_id}>{s.name}</option>)}
             </select>
           </Field>
           <div className="flex justify-end gap-2 pt-1 border-t" style={{ borderColor: 'var(--bdr)' }}>
@@ -94,15 +95,15 @@ function ClassesTab({ onAdd }) {
     if (!schoolId) return
     setLoading(true)
     const [{ data: cls }, { data: stf }] = await Promise.all([
-      supabase.from('classes').select('id, grade, section, capacity, student_count, class_teacher_id, staff(name)')
+      supabase.from('classes').select('id, grade, section, capacity, student_count, class_teacher_id, users(name)')
         .eq('school_id', schoolId).order('grade').order('section'),
-      supabase.from('staff').select('id, name').eq('school_id', schoolId).eq('is_active', true).order('name'),
+      supabase.from('staff').select('id, name, user_id').eq('school_id', schoolId).eq('is_active', true).order('name'),
     ])
     setClasses((cls ?? []).map(c => ({
       ...c,
       students:     c.student_count ?? 0,
       classTeacher: c.class_teacher_id ?? '',
-      teacherName:  c.staff?.name ?? '',
+      teacherName:  c.users?.name ?? '',
     })))
     setStaffList(stf ?? [])
     setLoading(false)
@@ -168,9 +169,11 @@ function ClassesTab({ onAdd }) {
       {editTarget  && <ClassModal staffList={staffList} initial={editTarget} onClose={() => setEditTarget(null)} onSave={handleEdit} />}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-[18px]">
-        <StatCard label="Total Classes"  value={loading ? '—' : String(classes.length)}  sub="across all grades" />
-        <StatCard label="Total Students" value={loading ? '—' : String(totalStudents)}   sub="enrolled" />
-        <StatCard label="Avg Class Size" value={loading ? '—' : String(avgSize)}         sub="students per class" />
+        {loading ? Array.from({length: 3}).map((_,i) => <SkeletonStatCard key={i} />) : <>
+          <StatCard label="Total Classes"  value={String(classes.length)}  sub="across all grades" className="anim-card" style={{ animationDelay: '0ms' }} />
+          <StatCard label="Total Students" value={String(totalStudents)}   sub="enrolled" className="anim-card" style={{ animationDelay: '60ms' }} />
+          <StatCard label="Avg Class Size" value={String(avgSize)}         sub="students per class" className="anim-card" style={{ animationDelay: '120ms' }} />
+        </>}
       </div>
 
       <Card>
@@ -179,12 +182,6 @@ function ClassesTab({ onAdd }) {
             <Plus size={12} className="mr-1" /> Add Class
           </Button>
         </CardHeader>
-        {loading ? (
-          <div className="flex items-center justify-center py-10">
-            <div className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin"
-              style={{ borderColor: 'var(--pri)', borderTopColor: 'transparent' }} />
-          </div>
-        ) : (
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
             <thead>
@@ -196,10 +193,12 @@ function ClassesTab({ onAdd }) {
               </tr>
             </thead>
             <tbody>
-              {classes.map(cls => {
+              {loading
+                ? Array.from({length: 5}).map((_,i) => <SkeletonTableRow key={i} cols={6} />)
+                : classes.map((cls, i) => {
                 const fill = Math.round(((cls.students || 0) / cls.capacity) * 100)
                 return (
-                  <tr key={cls.id} className="border-b last:border-b-0 hover:bg-[#FAFAF8]" style={{ borderColor: 'var(--bdr)' }}>
+                  <tr key={cls.id} className="anim-row border-b last:border-b-0 hover:bg-[#FAFAF8]" style={{ borderColor: 'var(--bdr)', animationDelay: `${i * 50}ms` }}>
                     <td className="px-3 py-[10px]">
                       <span className="font-syne text-[14px] font-semibold" style={{ color: 'var(--pri)' }}>
                         {cls.grade}-{cls.section}
@@ -238,7 +237,6 @@ function ClassesTab({ onAdd }) {
             </tbody>
           </table>
         </div>
-        )}
       </Card>
     </>
   )
@@ -283,7 +281,7 @@ function SubjectModal({ initial, onClose, onSave, staffList = [] }) {
           <Field label="Assigned Teacher">
             <select className={inputCls} style={inputStyle} value={form.teacher} onChange={e => set('teacher', e.target.value)}>
               <option value="">— Assign later —</option>
-              {staffList.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              {staffList.filter(s => s.user_id).map(s => <option key={s.id} value={s.user_id}>{s.name}</option>)}
             </select>
           </Field>
           <div>
@@ -329,14 +327,14 @@ function SubjectsTab({ onAdd }) {
     if (!schoolId) return
     setLoading(true)
     const [{ data: subs }, { data: stf }] = await Promise.all([
-      supabase.from('subjects').select('id, name, code, grades, teacher_id, staff(name)')
+      supabase.from('subjects').select('id, name, code, grades, teacher_id, users(name)')
         .eq('school_id', schoolId).order('name'),
-      supabase.from('staff').select('id, name').eq('school_id', schoolId).eq('is_active', true).order('name'),
+      supabase.from('staff').select('id, name, user_id').eq('school_id', schoolId).eq('is_active', true).order('name'),
     ])
     setSubjects((subs ?? []).map(s => ({
       ...s,
       teacher:        s.teacher_id ?? '',
-      teacherName:    s.staff?.name ?? '',
+      teacherName:    s.users?.name ?? '',
       periodsPerWeek: 4,
     })))
     setStaffList(stf ?? [])
@@ -397,9 +395,11 @@ function SubjectsTab({ onAdd }) {
       {editTarget && <SubjectModal staffList={staffList} initial={editTarget} onClose={() => setEditTarget(null)} onSave={handleEdit} />}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-[18px]">
-        <StatCard label="Total Subjects"    value={loading ? '—' : String(subjects.length)} sub="in curriculum" />
-        <StatCard label="Periods / Week"    value={loading ? '—' : String(totalPeriods)}    sub="across all subjects" />
-        <StatCard label="Assigned Teachers" value={loading ? '—' : String(subjects.filter(s => s.teacher).length)} sub={`of ${subjects.length} subjects`} />
+        {loading ? Array.from({length: 3}).map((_,i) => <SkeletonStatCard key={i} />) : <>
+          <StatCard label="Total Subjects"    value={String(subjects.length)} sub="in curriculum" className="anim-card" style={{ animationDelay: '0ms' }} />
+          <StatCard label="Periods / Week"    value={String(totalPeriods)}    sub="across all subjects" className="anim-card" style={{ animationDelay: '60ms' }} />
+          <StatCard label="Assigned Teachers" value={String(subjects.filter(s => s.teacher).length)} sub={`of ${subjects.length} subjects`} className="anim-card" style={{ animationDelay: '120ms' }} />
+        </>}
       </div>
 
       <Card>
@@ -408,12 +408,6 @@ function SubjectsTab({ onAdd }) {
             <Plus size={12} className="mr-1" /> Add Subject
           </Button>
         </CardHeader>
-        {loading ? (
-          <div className="flex items-center justify-center py-10">
-            <div className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin"
-              style={{ borderColor: 'var(--pri)', borderTopColor: 'transparent' }} />
-          </div>
-        ) : (
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
             <thead>
@@ -425,8 +419,10 @@ function SubjectsTab({ onAdd }) {
               </tr>
             </thead>
             <tbody>
-              {subjects.map(sub => (
-                <tr key={sub.id} className="border-b last:border-b-0 hover:bg-[#FAFAF8]" style={{ borderColor: 'var(--bdr)' }}>
+              {loading
+                ? Array.from({length: 5}).map((_,i) => <SkeletonTableRow key={i} cols={5} />)
+                : subjects.map((sub, i) => (
+                <tr key={sub.id} className="anim-row border-b last:border-b-0 hover:bg-[#FAFAF8]" style={{ borderColor: 'var(--bdr)', animationDelay: `${i * 50}ms` }}>
                   <td className="px-3 py-[10px] text-[13px] font-medium">{sub.name}</td>
                   <td className="px-3 py-[10px]">
                     <span className="text-[11px] font-mono px-1.5 py-0.5 rounded" style={{ background: '#f1efe8', color: 'var(--mut)' }}>
@@ -460,7 +456,6 @@ function SubjectsTab({ onAdd }) {
             </tbody>
           </table>
         </div>
-        )}
       </Card>
     </>
   )
@@ -681,9 +676,20 @@ function TimetableTab({ onAdd }) {
         </CardHeader>
 
         {loading ? (
-          <div className="flex items-center justify-center py-10">
-            <div className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin"
-              style={{ borderColor: 'var(--pri)', borderTopColor: 'transparent' }} />
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr>
+                  {['Time', 'Duration', 'Subject', 'Teacher', 'Room', 'Actions'].map(h => (
+                    <th key={h} className="text-[10px] uppercase tracking-[0.5px] font-medium text-left px-3 pb-2 pt-3 border-b"
+                      style={{ color: 'var(--mut)', borderColor: 'var(--bdr)' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {Array.from({length: 5}).map((_,i) => <SkeletonTableRow key={i} cols={6} />)}
+              </tbody>
+            </table>
           </div>
         ) : periods.length === 0 ? (
           <CardBody>
@@ -708,8 +714,8 @@ function TimetableTab({ onAdd }) {
                 </tr>
               </thead>
               <tbody>
-                {periods.map(p => (
-                  <tr key={p.id} className="border-b last:border-b-0 hover:bg-[#FAFAF8]" style={{ borderColor: 'var(--bdr)' }}>
+                {periods.map((p, i) => (
+                  <tr key={p.id} className="anim-row border-b last:border-b-0 hover:bg-[#FAFAF8]" style={{ borderColor: 'var(--bdr)', animationDelay: `${i * 50}ms` }}>
                     <td className="px-3 py-[10px] text-[12px] font-medium" style={{ color: 'var(--pri)' }}>{p.time}</td>
                     <td className="px-3 py-[10px] text-[12px]" style={{ color: 'var(--mut)' }}>{p.dur}</td>
                     <td className="px-3 py-[10px] text-[13px] font-medium">{p.subject}</td>

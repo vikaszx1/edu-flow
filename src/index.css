@@ -67,3 +67,16 @@ body {
   50% { opacity: 0.35; }
 }
 .sync-dot { animation: syncpulse 2s infinite; }
+
+/* Dashboard animations */
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.anim-row    { animation: fadeSlideUp 0.35s ease both; }
+.anim-card   { animation: fadeSlideUp 0.4s ease both; }
+.anim-number { animation: countUp 0.5s ease both; }

@@ -7,6 +7,7 @@ import Skeleton, { SkeletonStatCard, SkeletonTableRow, SkeletonListRow, Skeleton
 import useStore from '../store/useStore'
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import useCountUp from '../hooks/useCountUp'
 
 // Static weekly attendance chart data (decorative)
 const DAYS_SHORT = ['Mon','Tue','Wed','Thu','Fri','Sat']
@@ -22,17 +23,24 @@ const COLORS = ['bl','tl','pu','co','am','pk','gn']
 function getInitials(name = '') { return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() }
 function getColor(name = '')    { return 'av-' + COLORS[name.charCodeAt(0) % COLORS.length] }
 
-function ProgressBar({ value, width = 50 }) {
+function ProgressBar({ value, width = 50, delay = 0 }) {
+  const [w, setW] = useState(0)
+  useEffect(() => {
+    const t = setTimeout(() => setW(value), 80 + delay)
+    return () => clearTimeout(t)
+  }, [value, delay])
   const color = value >= 90 ? 'var(--teal)' : value >= 75 ? 'var(--amb)' : 'var(--red)'
   return (
     <div className="flex items-center gap-1.5">
       <div className="h-1 rounded overflow-hidden" style={{ width, background: '#f1efe8' }}>
-        <div className="h-full rounded" style={{ width: `${value}%`, background: color }} />
+        <div className="h-full rounded"
+          style={{ width: `${w}%`, background: color, transition: 'width 0.75s cubic-bezier(0.4,0,0.2,1)' }} />
       </div>
       <span className="text-[11px]" style={{ color: 'var(--mut)' }}>{value}%</span>
     </div>
   )
 }
+
 
 // ── Admin Dashboard ──────────────────────────────────────────────────────────
 
@@ -50,6 +58,10 @@ function AdminDashboard({ nav }) {
   const [stats,   setStats]   = useState({ total: 0, lowAtt: 0 })
   const [roster,  setRoster]  = useState([])
   const [loading, setLoading] = useState(true)
+  const [chartReady, setChartReady] = useState(false)
+
+  const totalCount  = useCountUp(stats.total,  !loading)
+  const lowAttCount = useCountUp(stats.lowAtt, !loading)
 
   useEffect(() => {
     if (!schoolId) return
@@ -70,6 +82,7 @@ function AdminDashboard({ nav }) {
         att: attMap[s.id] ?? null,
       })))
       setLoading(false)
+      setTimeout(() => setChartReady(true), 120)
     })
   }, [schoolId])
 
@@ -92,10 +105,10 @@ function AdminDashboard({ nav }) {
           Array.from({ length: 4 }).map((_, i) => <SkeletonStatCard key={i} />)
         ) : (
           <>
-            <StatCard label="Total Students"  value={String(stats.total)}   sub="Enrolled & active" />
-            <StatCard label="Low Attendance"  value={String(stats.lowAtt)}  downText={stats.lowAtt > 0 ? 'Below 75%' : ''} sub="need attention" />
-            <StatCard label="Classes Running" value="6"                     sub="across all grades" />
-            <StatCard label="Staff Members"   value="6"                     sub="teaching staff" />
+            <StatCard label="Total Students"  value={String(totalCount)}   sub="Enrolled & active" className="anim-card" style={{ animationDelay: '0ms' }} />
+            <StatCard label="Low Attendance"  value={String(lowAttCount)}  downText={stats.lowAtt > 0 ? 'Below 75%' : ''} sub="need attention" className="anim-card" style={{ animationDelay: '60ms' }} />
+            <StatCard label="Classes Running" value="6"                    sub="across all grades" className="anim-card" style={{ animationDelay: '120ms' }} />
+            <StatCard label="Staff Members"   value="6"                    sub="teaching staff" className="anim-card" style={{ animationDelay: '180ms' }} />
           </>
         )}
       </div>
@@ -115,8 +128,9 @@ function AdminDashboard({ nav }) {
               <tbody>
                 {loading
                   ? Array.from({ length: 5 }).map((_, i) => <SkeletonTableRow key={i} cols={4} hasAvatar />)
-                  : roster.map(s => (
-                    <tr key={s.id} className="border-b last:border-b-0 hover:bg-[#FAFAF8]" style={{ borderColor: 'var(--bdr)' }}>
+                  : roster.map((s, i) => (
+                    <tr key={s.id} className="anim-row border-b last:border-b-0 hover:bg-[#FAFAF8]"
+                      style={{ borderColor: 'var(--bdr)', animationDelay: `${i * 60}ms` }}>
                       <td className="px-2.5 py-[10px] text-[12px]">
                         <div className="flex items-center gap-2">
                           <Avatar initials={s.initials} colorKey={s.color.replace('av-','')} size="sm" />
@@ -125,7 +139,7 @@ function AdminDashboard({ nav }) {
                       </td>
                       <td className="px-2.5 py-[10px] text-[12px]">{s.cls}</td>
                       <td className="px-2.5 py-[10px]">
-                        {s.att != null ? <ProgressBar value={s.att} /> : <span className="text-[11px]" style={{ color: 'var(--mut)' }}>—</span>}
+                        {s.att != null ? <ProgressBar value={s.att} delay={i * 60} /> : <span className="text-[11px]" style={{ color: 'var(--mut)' }}>—</span>}
                       </td>
                       <td className="px-2.5 py-[10px]">
                         <Badge variant={s.att == null ? 'blue' : s.att >= 90 ? 'green' : s.att >= 75 ? 'amber' : 'red'}>
@@ -161,7 +175,12 @@ function AdminDashboard({ nav }) {
                     {weeklyAttendance.map((d, i) => (
                       <div key={d.label} className="flex-1 flex flex-col items-center gap-[3px]">
                         <div className="w-full rounded-t-[3px]"
-                          style={{ height: `${d.height}px`, background: d.isToday ? 'var(--acc)' : 'var(--pri)', opacity: d.isToday ? 1 : 0.4 + i * 0.1 }} />
+                          style={{
+                            height: chartReady ? `${d.height}px` : '0px',
+                            background: d.isToday ? 'var(--acc)' : 'var(--pri)',
+                            opacity: d.isToday ? 1 : 0.4 + i * 0.1,
+                            transition: `height 0.55s cubic-bezier(0.4,0,0.2,1) ${i * 60}ms`,
+                          }} />
                         <span className="text-[9px]" style={{ color: d.isToday ? 'var(--acc)' : 'var(--lgt)', fontWeight: d.isToday ? 600 : 400 }}>{d.label}</span>
                       </div>
                     ))}
@@ -188,8 +207,9 @@ function AdminDashboard({ nav }) {
                   { id:2, icon:'plus',  bg:'#e6f1fb', color:'#185fa5', text:'New student added to',  bold:'Class XI-B',  time:'Today, 9:12 AM' },
                   { id:3, icon:'warn',  bg:'#faeeda', color:'#854f0b', text:'Low attendance alert —',bold:'3 students',  time:'Yesterday'       },
                   { id:4, icon:'check', bg:'#e1f5ee', color:'#0f6e56', text:'Marks submitted for',   bold:'Unit Test 1', time:'Yesterday'       },
-                ].map(a => (
-                  <div key={a.id} className="flex gap-2.5 py-[9px] border-b last:border-b-0" style={{ borderColor: 'var(--bdr)' }}>
+                ].map((a, i) => (
+                  <div key={a.id} className="anim-row flex gap-2.5 py-[9px] border-b last:border-b-0"
+                    style={{ borderColor: 'var(--bdr)', animationDelay: `${i * 70}ms` }}>
                     <ActivityIcon type={a.icon} bg={a.bg} color={a.color} />
                     <div>
                       <div className="text-[12px]">{a.text} <strong>{a.bold}</strong></div>
@@ -257,7 +277,8 @@ function TeacherDashboard({ nav }) {
     load()
   }, [schoolId])
 
-  const doneCount = schedule.filter(c => c.done).length
+  const doneCount    = schedule.filter(c => c.done).length
+  const riskCount    = useCountUp(highRisk.length, !loading)
 
   return (
     <div>
@@ -267,9 +288,9 @@ function TeacherDashboard({ nav }) {
           Array.from({ length: 3 }).map((_, i) => <SkeletonStatCard key={i} />)
         ) : (
           <>
-            <StatCard label="Today's Classes"    value={`${doneCount}/${schedule.length}`} sub="completed today" />
-            <StatCard label="High-Risk Students" value={String(highRisk.length)} downText={highRisk.length > 0 ? 'Below 75%' : ''} sub="need attention" />
-            <StatCard label="School"             value="DPS" sub="Delhi Public School" />
+            <StatCard label="Today's Classes"    value={`${doneCount}/${schedule.length}`} sub="completed today" className="anim-card" style={{ animationDelay: '0ms' }} />
+            <StatCard label="High-Risk Students" value={String(riskCount)} downText={highRisk.length > 0 ? 'Below 75%' : ''} sub="need attention" className="anim-card" style={{ animationDelay: '60ms' }} />
+            <StatCard label="School"             value="DPS" sub="Delhi Public School" className="anim-card" style={{ animationDelay: '120ms' }} />
           </>
         )}
       </div>
@@ -283,8 +304,9 @@ function TeacherDashboard({ nav }) {
               ? Array.from({ length: 3 }).map((_, i) => <SkeletonListRow key={i} />)
               : schedule.length === 0
                 ? <div className="py-6 text-center text-[12px]" style={{ color: 'var(--lgt)' }}>No classes scheduled today</div>
-                : schedule.map(c => (
-                  <div key={c.id} className="flex items-center gap-3 py-[9px] border-b last:border-b-0" style={{ borderColor: 'var(--bdr)' }}>
+                : schedule.map((c, i) => (
+                  <div key={c.id} className="anim-row flex items-center gap-3 py-[9px] border-b last:border-b-0"
+                    style={{ borderColor: 'var(--bdr)', animationDelay: `${i * 60}ms` }}>
                     <div className="w-7 h-7 rounded-[7px] flex items-center justify-center flex-shrink-0"
                       style={{ background: c.done ? '#e1f5ee' : '#e6f1fb' }}>
                       {c.done ? <CheckCircle2 size={13} style={{ color: '#0f6e56' }} /> : <Clock size={13} style={{ color: '#185fa5' }} />}
@@ -308,12 +330,13 @@ function TeacherDashboard({ nav }) {
               ? Array.from({ length: 3 }).map((_, i) => <SkeletonListRow key={i} />)
               : highRisk.length === 0
                 ? <div className="py-6 text-center text-[12px]" style={{ color: 'var(--teal)' }}>All students above 75% attendance</div>
-                : highRisk.map(s => (
-                  <div key={s.id} className="flex items-center gap-2.5 py-[9px] border-b last:border-b-0" style={{ borderColor: 'var(--bdr)' }}>
+                : highRisk.map((s, i) => (
+                  <div key={s.id} className="anim-row flex items-center gap-2.5 py-[9px] border-b last:border-b-0"
+                    style={{ borderColor: 'var(--bdr)', animationDelay: `${i * 60}ms` }}>
                     <Avatar initials={s.initials} colorKey={s.color} size="sm" />
                     <div className="flex-1">
                       <div className="text-[12px] font-medium">{s.name} — {s.cls}</div>
-                      <ProgressBar value={s.att} width={80} />
+                      <ProgressBar value={s.att} width={80} delay={i * 60} />
                     </div>
                     <div className="flex items-center gap-1 text-[11px]" style={{ color: 'var(--red)' }}>
                       <TrendingDown size={12} /> {s.att}%
@@ -367,10 +390,13 @@ function StudentDashboard({ nav }) {
     load()
   }, [])
 
-  const attColorVal = attStats.pct >= 90 ? 'var(--teal)' : attStats.pct >= 75 ? 'var(--amb)' : 'var(--red)'
-  const clsLabel    = student?.classes ? `${student.classes.grade}-${student.classes.section}` : '—'
-  const allScores   = marks.map(m => (m.score / m.max) * 100)
-  const avgScore    = allScores.length ? Math.round(allScores.reduce((a, b) => a + b, 0) / allScores.length) : null
+  const attColorVal  = attStats.pct >= 90 ? 'var(--teal)' : attStats.pct >= 75 ? 'var(--amb)' : 'var(--red)'
+  const clsLabel     = student?.classes ? `${student.classes.grade}-${student.classes.section}` : '—'
+  const allScores    = marks.map(m => (m.score / m.max) * 100)
+  const avgScore     = allScores.length ? Math.round(allScores.reduce((a, b) => a + b, 0) / allScores.length) : null
+  const attPctAnim   = useCountUp(attStats.pct,     !loading)
+  const avgScoreAnim = useCountUp(avgScore ?? 0,    !loading)
+  const presentAnim  = useCountUp(attStats.present, !loading)
 
   return (
     <div>
@@ -396,9 +422,9 @@ function StudentDashboard({ nav }) {
           Array.from({ length: 3 }).map((_, i) => <SkeletonStatCard key={i} />)
         ) : (
           <>
-            <StatCard label="Attendance"   value={`${attStats.pct}%`} upText={attStats.pct >= 75 ? 'Above threshold' : ''} sub="this academic year" />
-            <StatCard label="Avg Score"    value={avgScore !== null ? `${avgScore}%` : '—'} upText={avgScore !== null && avgScore >= 80 ? 'Top performer' : ''} sub="all exams" />
-            <StatCard label="Days Present" value={String(attStats.present)} sub={`of ${attStats.total} days`} />
+            <StatCard label="Attendance"   value={`${attPctAnim}%`}  upText={attStats.pct >= 75 ? 'Above threshold' : ''} sub="this academic year" className="anim-card" style={{ animationDelay: '0ms' }} />
+            <StatCard label="Avg Score"    value={avgScore !== null ? `${avgScoreAnim}%` : '—'} upText={avgScore !== null && avgScore >= 80 ? 'Top performer' : ''} sub="all exams" className="anim-card" style={{ animationDelay: '60ms' }} />
+            <StatCard label="Days Present" value={String(presentAnim)} sub={`of ${attStats.total} days`} className="anim-card" style={{ animationDelay: '120ms' }} />
           </>
         )}
       </div>
@@ -452,14 +478,15 @@ function StudentDashboard({ nav }) {
                     const pct   = Math.round((m.score / m.max) * 100)
                     const color = pct >= 85 ? 'var(--teal)' : pct >= 65 ? 'var(--amb)' : 'var(--red)'
                     return (
-                      <div key={i} className="flex items-center gap-3 py-[9px] border-b last:border-b-0" style={{ borderColor: 'var(--bdr)' }}>
+                      <div key={i} className="anim-row flex items-center gap-3 py-[9px] border-b last:border-b-0"
+                        style={{ borderColor: 'var(--bdr)', animationDelay: `${i * 70}ms` }}>
                         <div className="flex-1">
                           <div className="text-[12px] font-medium">{m.subject}</div>
                           <div className="text-[10px]" style={{ color: 'var(--mut)' }}>{m.exam}</div>
                         </div>
                         <div className="text-right">
                           <div className="text-[13px] font-semibold" style={{ color }}>{m.score}/{m.max}</div>
-                          <ProgressBar value={pct} width={60} />
+                          <ProgressBar value={pct} width={60} delay={i * 70} />
                         </div>
                       </div>
                     )
@@ -484,7 +511,10 @@ function SuperAdminDashboard({ nav }) {
       .then(({ data }) => { setSchools(data ?? []); setLoading(false) })
   }, [])
 
-  const activeCount = schools.filter(s => s.is_active).length
+  const activeCount     = schools.filter(s => s.is_active).length
+  const totalAnim       = useCountUp(schools.length, !loading)
+  const activeAnim      = useCountUp(activeCount,    !loading)
+  const inactiveAnim    = useCountUp(schools.length - activeCount, !loading)
 
   return (
     <div>
@@ -507,10 +537,10 @@ function SuperAdminDashboard({ nav }) {
           Array.from({ length: 4 }).map((_, i) => <SkeletonStatCard key={i} />)
         ) : (
           <>
-            <StatCard label="Total Schools"  value={String(schools.length)}             sub="registered" />
-            <StatCard label="Active Schools" value={String(activeCount)}                sub="currently running" />
-            <StatCard label="Inactive"       value={String(schools.length - activeCount)} sub="disabled" />
-            <StatCard label="Platform"       value="v0.1"                               sub="EduFlow Native" />
+            <StatCard label="Total Schools"  value={String(totalAnim)}   sub="registered"        className="anim-card" style={{ animationDelay: '0ms' }} />
+            <StatCard label="Active Schools" value={String(activeAnim)}  sub="currently running"  className="anim-card" style={{ animationDelay: '60ms' }} />
+            <StatCard label="Inactive"       value={String(inactiveAnim)} sub="disabled"          className="anim-card" style={{ animationDelay: '120ms' }} />
+            <StatCard label="Platform"       value="v0.1"                sub="EduFlow Native"     className="anim-card" style={{ animationDelay: '180ms' }} />
           </>
         )}
       </div>
@@ -528,8 +558,9 @@ function SuperAdminDashboard({ nav }) {
             <tbody>
               {loading
                 ? Array.from({ length: 5 }).map((_, i) => <SkeletonTableRow key={i} cols={4} />)
-                : schools.slice(0, 5).map(s => (
-                  <tr key={s.id} className="border-b last:border-b-0 hover:bg-[#FAFAF8]" style={{ borderColor: 'var(--bdr)' }}>
+                : schools.slice(0, 5).map((s, i) => (
+                  <tr key={s.id} className="anim-row border-b last:border-b-0 hover:bg-[#FAFAF8]"
+                    style={{ borderColor: 'var(--bdr)', animationDelay: `${i * 60}ms` }}>
                     <td className="px-2.5 py-[10px] text-[12px] font-medium max-w-[220px] truncate">{s.name}</td>
                     <td className="px-2.5 py-[10px] text-[12px]" style={{ color: 'var(--mut)' }}>{s.city ?? '—'}</td>
                     <td className="px-2.5 py-[10px] text-[11px]" style={{ color: 'var(--mut)' }}>

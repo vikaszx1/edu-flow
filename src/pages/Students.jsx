@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { X, Phone, Mail, User, BookOpen } from 'lucide-react'
+import useCountUp from '../hooks/useCountUp'
 import Avatar from '../components/ui/Avatar'
 import Badge, { statusVariant } from '../components/ui/Badge'
 import StatCard from '../components/ui/StatCard'
 import { Card, CardHeader } from '../components/ui/Card'
 import Button from '../components/ui/Button'
+import { SkeletonStatCard, SkeletonTableRow } from '../components/ui/Skeleton'
 import useStore from '../store/useStore'
 import { supabase } from '../lib/supabase'
 
@@ -15,6 +17,19 @@ function getInitials(name = '') { return name.split(' ').map(w => w[0]).join('')
 function getColor(name = '')    { return 'av-' + COLORS[name.charCodeAt(0) % COLORS.length] }
 function attColor(v)            { return v >= 90 ? 'var(--teal)' : v >= 75 ? 'var(--amb)' : 'var(--red)' }
 function attStatus(pct)         { if (pct == null) return 'New'; if (pct >= 90) return 'Active'; if (pct >= 75) return 'Warning'; return 'At Risk' }
+
+function AttBar({ value, delay = 0 }) {
+  const [w, setW] = useState(0)
+  useEffect(() => { const t = setTimeout(() => setW(value), 80 + delay); return () => clearTimeout(t) }, [value, delay])
+  return (
+    <div className="flex items-center gap-1.5">
+      <div className="w-[44px] h-1 rounded overflow-hidden" style={{ background: '#f1efe8' }}>
+        <div className="h-full rounded" style={{ width: `${w}%`, background: attColor(w), transition: 'width 0.7s cubic-bezier(0.4,0,0.2,1)' }} />
+      </div>
+      <span className="text-[12px]">{value}%</span>
+    </div>
+  )
+}
 
 function dbToUI(s, attMap) {
   const att = attMap[s.id] ?? null
@@ -225,7 +240,10 @@ export default function Students() {
     return matchClass && matchSearch
   })
 
-  const lowAtt = students.filter(s => s.att != null && s.att < 75).length
+  const lowAtt      = students.filter(s => s.att != null && s.att < 75).length
+  const totalAnim   = useCountUp(students.length, !loading)
+  const activeAnim  = useCountUp(students.filter(s => s.status === 'Active').length, !loading)
+  const lowAttAnim  = useCountUp(lowAtt, !loading)
 
   return (
     <div>
@@ -233,9 +251,11 @@ export default function Students() {
       {showAdd && <AddStudentModal onClose={() => setShowAdd(false)} onAdded={fetchStudents} classes={classes} />}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-[18px]">
-        <StatCard label="Total Enrolled" value={loading ? '—' : String(students.length)} sub="Across all classes" />
-        <StatCard label="Active Today"   value={loading ? '—' : String(students.filter(s => s.status === 'Active').length)} upText="" sub="" />
-        <StatCard label="Low Attendance" value={loading ? '—' : String(lowAtt)} downText={lowAtt > 0 ? 'Below 75%' : ''} sub="" />
+        {loading ? Array.from({length: 3}).map((_,i) => <SkeletonStatCard key={i} />) : <>
+          <StatCard label="Total Enrolled" value={String(totalAnim)}  sub="Across all classes" className="anim-card" style={{ animationDelay: '0ms' }} />
+          <StatCard label="Active Today"   value={String(activeAnim)} sub="" className="anim-card" style={{ animationDelay: '60ms' }} />
+          <StatCard label="Low Attendance" value={String(lowAttAnim)} downText={lowAtt > 0 ? 'Below 75%' : ''} sub="" className="anim-card" style={{ animationDelay: '120ms' }} />
+        </>}
       </div>
 
       <Card>
@@ -250,11 +270,6 @@ export default function Students() {
           </div>
         </CardHeader>
 
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'var(--pri)', borderTopColor: 'transparent' }} />
-          </div>
-        ) : (
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
             <thead>
@@ -266,11 +281,13 @@ export default function Students() {
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 ? (
+              {loading
+                ? Array.from({length: 8}).map((_,i) => <SkeletonTableRow key={i} cols={8} hasAvatar />)
+                : filtered.length === 0 ? (
                 <tr><td colSpan={8} className="px-2.5 py-8 text-center text-[12px]" style={{ color: 'var(--mut)' }}>No students found</td></tr>
-              ) : filtered.map(s => (
-                <tr key={s.id} className="border-b last:border-b-0 hover:bg-[#FAFAF8] transition-colors cursor-pointer"
-                  style={{ borderColor: 'var(--bdr)' }} onClick={() => setViewStudent(s)}>
+              ) : filtered.map((s, i) => (
+                <tr key={s.id} className="anim-row border-b last:border-b-0 hover:bg-[#FAFAF8] transition-colors cursor-pointer"
+                  style={{ borderColor: 'var(--bdr)', animationDelay: `${i * 50}ms` }} onClick={() => setViewStudent(s)}>
                   <td className="px-2.5 py-[10px] text-[12px]">
                     <div className="flex items-center gap-2">
                       <Avatar initials={s.initials} colorKey={s.color.replace('av-','')} size="sm" />
@@ -286,12 +303,7 @@ export default function Students() {
                   <td className="px-2.5 py-[10px] text-[12px]">{s.phone}</td>
                   <td className="px-2.5 py-[10px]">
                     {s.att != null ? (
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-[44px] h-1 rounded overflow-hidden" style={{ background: '#f1efe8' }}>
-                          <div className="h-full rounded" style={{ width: `${s.att}%`, background: attColor(s.att) }} />
-                        </div>
-                        <span className="text-[12px]">{s.att}%</span>
-                      </div>
+                      <AttBar value={s.att} delay={i * 50} />
                     ) : <span className="text-[11px]" style={{ color: 'var(--mut)' }}>New</span>}
                   </td>
                   <td className="px-2.5 py-[10px]"><Badge variant={statusVariant(s.status)}>{s.status}</Badge></td>
@@ -304,7 +316,6 @@ export default function Students() {
             </tbody>
           </table>
         </div>
-        )}
       </Card>
     </div>
   )

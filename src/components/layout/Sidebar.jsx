@@ -3,12 +3,14 @@ import {
   UserCog, FileBarChart2, Settings, LogOut, Layers,
   GraduationCap, History, FileText, Building2, CreditCard, Server, X, BookOpen, Wand2,
 } from 'lucide-react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import useStore from '../../store/useStore'
+import { supabase } from '../../lib/supabase'
 
 const NAV_MAIN = [
   { id: 'dashboard',  label: 'Dashboard',   icon: LayoutGrid,     roles: ['superadmin','admin','teacher','student'], badge: null },
-  { id: 'students',   label: 'Students',    icon: Users,          roles: ['admin','teacher'],                        badge: '842' },
+  { id: 'students',   label: 'Students',    icon: Users,          roles: ['admin','teacher'],                        badge: null },
   { id: 'timetable',  label: 'Timetable',   icon: Calendar,       roles: ['admin','teacher','student'],              badge: null },
   { id: 'attendance', label: 'Attendance',  icon: ClipboardCheck, roles: ['admin','teacher'],                        badge: null },
   { id: 'marks',           label: 'Marks Entry',        icon: FileEdit,  roles: ['admin','teacher'],           badge: null },
@@ -84,7 +86,27 @@ function NavSection({ label, items, activePage, onNav, role }) {
 export default function Sidebar() {
   const { activePage, userRole, user, setActivePage, logout, toast } = useStore()
   const setSidebarOpen = useStore(s => s.setSidebarOpen)
+  const schoolId       = useStore(s => s.schoolId)
+  const schoolName     = useStore(s => s.schoolName)
   const navigate = useNavigate()
+
+  const [studentCount, setStudentCount] = useState(null)
+
+  useEffect(() => {
+    if (!schoolId || !['admin','teacher'].includes(userRole)) return
+    supabase
+      .from('students')
+      .select('id', { count: 'exact', head: true })
+      .eq('school_id', schoolId)
+      .eq('is_active', true)
+      .then(({ count }) => { if (count != null) setStudentCount(count) })
+  }, [schoolId, userRole])
+
+  const navMain = NAV_MAIN.map(item =>
+    item.id === 'students' && studentCount != null
+      ? { ...item, badge: String(studentCount) }
+      : item
+  )
 
   return (
     <div
@@ -122,8 +144,20 @@ export default function Sidebar() {
         </button>
       </div>
 
+      {/* School name pill */}
+      {schoolName && (
+        <div className="px-4 py-2.5 border-b" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+          <div
+            className="text-[11px] font-medium truncate px-2.5 py-1.5 rounded-[6px] text-center"
+            style={{ background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.8)' }}
+          >
+            {schoolName}
+          </div>
+        </div>
+      )}
+
       {/* Navigation */}
-      <NavSection label="Main"       items={NAV_MAIN}       activePage={activePage} onNav={setActivePage} role={userRole} />
+      <NavSection label="Main"       items={navMain}        activePage={activePage} onNav={setActivePage} role={userRole} />
       <NavSection label="Admin"      items={NAV_ADMIN}      activePage={activePage} onNav={setActivePage} role={userRole} />
       <NavSection label="My Portal"  items={NAV_STUDENT}    activePage={activePage} onNav={setActivePage} role={userRole} />
       <NavSection label="Control"    items={NAV_SUPERADMIN} activePage={activePage} onNav={setActivePage} role={userRole} />

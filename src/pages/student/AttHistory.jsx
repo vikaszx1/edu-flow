@@ -1,18 +1,22 @@
 import { useState, useEffect } from 'react'
 import Badge from '../../components/ui/Badge'
 import StatCard from '../../components/ui/StatCard'
+import useCountUp from '../../hooks/useCountUp'
 import { Card, CardHeader } from '../../components/ui/Card'
+import { SkeletonProfile, SkeletonStatCard, SkeletonTableRow } from '../../components/ui/Skeleton'
 import useStore from '../../store/useStore'
 import { supabase } from '../../lib/supabase'
 
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
-function ProgressBar({ value }) {
+function ProgressBar({ value, delay = 0 }) {
+  const [w, setW] = useState(0)
+  useEffect(() => { const t = setTimeout(() => setW(value), 80 + delay); return () => clearTimeout(t) }, [value, delay])
   const color = value >= 90 ? 'var(--teal)' : value >= 75 ? 'var(--amb)' : 'var(--red)'
   return (
     <div className="flex items-center gap-2">
       <div className="flex-1 h-[6px] rounded-full overflow-hidden" style={{ background: '#f1efe8' }}>
-        <div className="h-full rounded-full" style={{ width: `${Math.min(value,100)}%`, background: color }} />
+        <div className="h-full rounded-full" style={{ width: `${Math.min(w,100)}%`, background: color, transition: 'width 0.7s cubic-bezier(0.4,0,0.2,1)' }} />
       </div>
       <span className="text-[12px] font-medium w-8 text-right" style={{ color }}>{value}%</span>
     </div>
@@ -93,64 +97,62 @@ export default function AttHistory() {
   return (
     <div>
       {/* Profile banner */}
-      <div className="rounded-[11px] p-4 mb-4 flex items-center gap-4 border"
-        style={{ background: 'var(--surf)', borderColor: 'var(--bdr)' }}>
-        <div>
-          <div className="font-syne text-[16px] font-semibold">
-            {loading ? '—' : (student?.name ?? '—')}
+      {loading ? <SkeletonProfile /> : (
+        <div className="rounded-[11px] p-4 mb-4 flex items-center gap-4 border"
+          style={{ background: 'var(--surf)', borderColor: 'var(--bdr)' }}>
+          <div>
+            <div className="font-syne text-[16px] font-semibold">{student?.name ?? '—'}</div>
+            <div className="text-[12px]" style={{ color: 'var(--mut)' }}>
+              {clsLabel ? `Class ${clsLabel} · ` : ''}Roll #{student?.roll_number ?? '—'} · AY 2025–26
+            </div>
           </div>
-          <div className="text-[12px]" style={{ color: 'var(--mut)' }}>
-            {clsLabel ? `Class ${clsLabel} · ` : ''}Roll #{student?.roll_number ?? '—'} · AY 2025–26
+          <div className="ml-auto text-right">
+            <div className="font-syne text-2xl font-semibold"
+              style={{ color: overallPct >= 90 ? 'var(--teal)' : overallPct >= 75 ? 'var(--amb)' : 'var(--red)' }}>
+              {overallPct}%
+            </div>
+            <div className="text-[11px]" style={{ color: 'var(--mut)' }}>{totalPresent}/{totalDays} days present</div>
           </div>
         </div>
-        <div className="ml-auto text-right">
-          <div className="font-syne text-2xl font-semibold"
-            style={{ color: overallPct >= 90 ? 'var(--teal)' : overallPct >= 75 ? 'var(--amb)' : 'var(--red)' }}>
-            {loading ? '—' : `${overallPct}%`}
-          </div>
-          <div className="text-[11px]" style={{ color: 'var(--mut)' }}>{totalPresent}/{totalDays} days present</div>
-        </div>
-      </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-[18px]">
-        <StatCard label="Present"  value={loading ? '—' : String(totalPresent)}
-          upText={overallPct ? `${overallPct}%` : ''} sub="of school days" />
-        <StatCard label="Absent"   value={loading ? '—' : String(totalAbsent)}
-          downText={totalAbsent > 0 ? `${totalAbsent} days` : ''} sub="this year" />
-        <StatCard label="Late"     value={loading ? '—' : String(totalLate)} sub="arrivals recorded" />
-        <StatCard label="Working Days" value={loading ? '—' : String(totalDays)} sub="recorded" />
+        {loading ? Array.from({length: 4}).map((_,i) => <SkeletonStatCard key={i} />) : <>
+          <StatCard label="Present"      value={String(totalPresent)}
+            upText={overallPct ? `${overallPct}%` : ''} sub="of school days" className="anim-card" style={{ animationDelay: '0ms' }} />
+          <StatCard label="Absent"       value={String(totalAbsent)}
+            downText={totalAbsent > 0 ? `${totalAbsent} days` : ''} sub="this year" className="anim-card" style={{ animationDelay: '60ms' }} />
+          <StatCard label="Late"         value={String(totalLate)} sub="arrivals recorded" className="anim-card" style={{ animationDelay: '120ms' }} />
+          <StatCard label="Working Days" value={String(totalDays)} sub="recorded" className="anim-card" style={{ animationDelay: '180ms' }} />
+        </>}
       </div>
 
       {/* Monthly breakdown */}
       <Card>
         <CardHeader title="Monthly Breakdown" />
-        {loading ? (
-          <div className="flex items-center justify-center py-10">
-            <div className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin"
-              style={{ borderColor: 'var(--pri)', borderTopColor: 'transparent' }} />
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr>
-                  {['Month','Present','Absent','Late','Working Days','Attendance'].map(h => (
-                    <th key={h} className="text-[10px] uppercase tracking-[0.5px] font-medium text-left px-3 pb-2 pt-3 border-b"
-                      style={{ color: 'var(--mut)', borderColor: 'var(--bdr)' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {months.length === 0 ? (
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr>
+                {['Month','Present','Absent','Late','Working Days','Attendance'].map(h => (
+                  <th key={h} className="text-[10px] uppercase tracking-[0.5px] font-medium text-left px-3 pb-2 pt-3 border-b"
+                    style={{ color: 'var(--mut)', borderColor: 'var(--bdr)' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {loading
+                ? Array.from({length: 6}).map((_,i) => <SkeletonTableRow key={i} cols={6} />)
+                : months.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="px-3 py-10 text-center text-[12px]" style={{ color: 'var(--lgt)' }}>
                       No attendance records found
                     </td>
                   </tr>
-                ) : months.map(row => (
-                  <tr key={row.month} className="border-b last:border-b-0 hover:bg-[#FAFAF8]"
-                    style={{ borderColor: 'var(--bdr)' }}>
+                ) : months.map((row, i) => (
+                  <tr key={row.month} className="anim-row border-b last:border-b-0 hover:bg-[#FAFAF8]"
+                    style={{ borderColor: 'var(--bdr)', animationDelay: `${i * 55}ms` }}>
                     <td className="px-3 py-[10px] text-[13px] font-medium">{row.month}</td>
                     <td className="px-3 py-[10px]"><Badge variant="green">{row.present}</Badge></td>
                     <td className="px-3 py-[10px]">
@@ -169,10 +171,9 @@ export default function AttHistory() {
                     </td>
                   </tr>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+            </tbody>
+          </table>
+        </div>
       </Card>
 
       {/* Threshold notices */}

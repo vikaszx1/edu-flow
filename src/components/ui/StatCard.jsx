@@ -1,8 +1,8 @@
-export default function StatCard({ label, value, sub, upText, downText }) {
+export default function StatCard({ label, value, sub, upText, downText, className = '', style: extraStyle }) {
   return (
     <div
-      className="rounded-[10px] p-4 border"
-      style={{ background: 'var(--surf)', borderColor: 'var(--bdr)' }}
+      className={`rounded-[10px] p-4 border ${className}`}
+      style={{ background: 'var(--surf)', borderColor: 'var(--bdr)', ...extraStyle }}
     >
       <div
         className="text-[10px] uppercase tracking-[0.3px] mb-1.5"

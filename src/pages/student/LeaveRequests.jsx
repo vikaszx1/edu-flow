@@ -3,6 +3,7 @@ import { Plus, X } from 'lucide-react'
 import Badge from '../../components/ui/Badge'
 import Avatar from '../../components/ui/Avatar'
 import { Card, CardHeader, CardBody } from '../../components/ui/Card'
+import { SkeletonTableRow, SkeletonListRow } from '../../components/ui/Skeleton'
 import useStore from '../../store/useStore'
 import { supabase } from '../../lib/supabase'
 
@@ -155,32 +156,28 @@ function StudentLeaveView() {
 
       <Card>
         <CardHeader title="Leave History" />
-        {loading ? (
-          <div className="flex items-center justify-center py-10">
-            <div className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin"
-              style={{ borderColor: 'var(--pri)', borderTopColor: 'transparent' }} />
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr>
-                  {['From','To','Days','Reason','Status'].map(h => (
-                    <th key={h} className="text-[10px] uppercase tracking-[0.5px] font-medium text-left px-3 pb-2 pt-3 border-b"
-                      style={{ color: 'var(--mut)', borderColor: 'var(--bdr)' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {requests.length === 0 ? (
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr>
+                {['From','To','Days','Reason','Status'].map(h => (
+                  <th key={h} className="text-[10px] uppercase tracking-[0.5px] font-medium text-left px-3 pb-2 pt-3 border-b"
+                    style={{ color: 'var(--mut)', borderColor: 'var(--bdr)' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {loading
+                ? Array.from({length: 5}).map((_,i) => <SkeletonTableRow key={i} cols={5} />)
+                : requests.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-3 py-10 text-center text-[12px]" style={{ color: 'var(--lgt)' }}>
                       No leave requests yet
                     </td>
                   </tr>
-                ) : requests.map(row => (
-                  <tr key={row.id} className="border-b last:border-b-0 hover:bg-[#FAFAF8]"
-                    style={{ borderColor: 'var(--bdr)' }}>
+                ) : requests.map((row, i) => (
+                  <tr key={row.id} className="anim-row border-b last:border-b-0 hover:bg-[#FAFAF8]"
+                    style={{ borderColor: 'var(--bdr)', animationDelay: `${i * 50}ms` }}>
                     <td className="px-3 py-[10px] text-[12px]">{fmt(row.from_date)}</td>
                     <td className="px-3 py-[10px] text-[12px]">{fmt(row.to_date)}</td>
                     <td className="px-3 py-[10px] text-[12px]">{daysBetween(row.from_date, row.to_date)}</td>
@@ -195,10 +192,9 @@ function StudentLeaveView() {
                     </td>
                   </tr>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+            </tbody>
+          </table>
+        </div>
       </Card>
     </div>
   )
@@ -324,19 +320,21 @@ function TeacherLeaveView() {
       )}
 
       {loading ? (
-        <div className="flex items-center justify-center py-16">
-          <div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin"
-            style={{ borderColor: 'var(--pri)', borderTopColor: 'transparent' }} />
-        </div>
+        <Card>
+          <CardHeader title="Leave Requests" />
+          <CardBody className="py-2.5 px-3.5">
+            {Array.from({length: 6}).map((_,i) => <SkeletonListRow key={i} />)}
+          </CardBody>
+        </Card>
       ) : (
         <>
           {pending.length > 0 && (
             <Card>
               <CardHeader title={`Pending Requests (${pending.length})`} />
               <CardBody className="py-2.5 px-3.5">
-                {pending.map(r => (
-                  <div key={r.id} className="flex items-center gap-3 py-[10px] border-b last:border-b-0"
-                    style={{ borderColor: 'var(--bdr)' }}>
+                {pending.map((r, i) => (
+                  <div key={r.id} className="anim-row flex items-center gap-3 py-[10px] border-b last:border-b-0"
+                    style={{ borderColor: 'var(--bdr)', animationDelay: `${i * 50}ms` }}>
                     <Avatar initials={r.initials} colorKey={r.color} size="sm" />
                     <div className="flex-1 min-w-0">
                       <div className="text-[13px] font-medium">
@@ -365,9 +363,9 @@ function TeacherLeaveView() {
             <Card>
               <CardHeader title="Reviewed" />
               <CardBody className="py-2.5 px-3.5">
-                {reviewed.map(r => (
-                  <div key={r.id} className="flex items-center gap-3 py-[10px] border-b last:border-b-0"
-                    style={{ borderColor: 'var(--bdr)' }}>
+                {reviewed.map((r, i) => (
+                  <div key={r.id} className="anim-row flex items-center gap-3 py-[10px] border-b last:border-b-0"
+                    style={{ borderColor: 'var(--bdr)', animationDelay: `${i * 50}ms` }}>
                     <Avatar initials={r.initials} colorKey={r.color} size="sm" />
                     <div className="flex-1 min-w-0">
                       <div className="text-[13px] font-medium">
