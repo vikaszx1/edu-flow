@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { X, Phone, Mail, User, BookOpen } from 'lucide-react'
+import { X, Phone, Mail, User, BookOpen, MessageSquare } from 'lucide-react'
 import useCountUp from '../hooks/useCountUp'
 import Avatar from '../components/ui/Avatar'
 import Badge, { statusVariant } from '../components/ui/Badge'
@@ -36,6 +36,7 @@ function dbToUI(s, attMap) {
   const cls = s.classes ? `${s.classes.grade}-${s.classes.section}` : '—'
   return {
     id:       s.id,
+    user_id:  s.user_id ?? null,
     initials: getInitials(s.name),
     color:    getColor(s.name),
     name:     s.name,
@@ -52,7 +53,17 @@ function dbToUI(s, attMap) {
 
 // ── Student Detail Modal ──────────────────────────────────────────────────────
 function StudentDetailModal({ student: s, onClose }) {
+  const setActivePage      = useStore(st => st.setActivePage)
+  const setPendingDmUserId = useStore(st => st.setPendingDmUserId)
+
   if (!s) return null
+
+  function handleMessage() {
+    setPendingDmUserId(s.user_id)
+    setActivePage('chat')
+    onClose()
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.35)' }}>
       <div className="rounded-[14px] border w-full max-w-[480px]" style={{ background: 'var(--surf)', borderColor: 'var(--bdr)' }}>
@@ -97,7 +108,21 @@ function StudentDetailModal({ student: s, onClose }) {
             </div>
           )}
         </div>
-        <div className="px-5 py-3 border-t flex justify-end" style={{ borderColor: 'var(--bdr)' }}>
+        <div className="px-5 py-3 border-t flex items-center justify-between" style={{ borderColor: 'var(--bdr)' }}>
+          {s.user_id ? (
+            <button
+              onClick={handleMessage}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] text-[12px] font-medium transition-colors"
+              style={{ background: 'rgba(26,58,92,0.08)', color: 'var(--pri)' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(26,58,92,0.14)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'rgba(26,58,92,0.08)'}
+            >
+              <MessageSquare size={13} />
+              Send Message
+            </button>
+          ) : (
+            <span className="text-[11px]" style={{ color: 'var(--lgt)' }}>No login account</span>
+          )}
           <Button variant="outline" onClick={onClose}>Close</Button>
         </div>
       </div>
@@ -206,7 +231,7 @@ export default function Students() {
     const [{ data: rows }, { data: attRows }] = await Promise.all([
       supabase
         .from('students')
-        .select('id, name, email, roll_number, parent_name, phone, class_id, classes(grade,section)')
+        .select('id, name, email, roll_number, parent_name, phone, class_id, user_id, classes(grade,section)')
         .eq('school_id', schoolId)
         .eq('is_active', true)
         .order('roll_number'),

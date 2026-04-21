@@ -30,6 +30,8 @@ export const PAGE_CONFIG = {
   mygrades:      { title: 'My Grades',          btnLabel: 'Download Report',  btnRoles: ['student']                },
   atthistory:    { title: 'Attendance History', btnLabel: 'Export',           btnRoles: ['student']                },
   leaverequests: { title: 'Leave Requests',     btnLabel: '+ Apply for Leave',btnRoles: ['student']               },
+  // Chat
+  chat:          { title: 'Messages',            btnLabel: null,               btnRoles: []                         },
   // Super admin
   schools:       { title: 'Schools',            btnLabel: '+ Register School',btnRoles: ['superadmin']             },
   principals:    { title: 'Principals',         btnLabel: '+ Add Principal',  btnRoles: ['superadmin']             },
@@ -44,9 +46,14 @@ const useStore = create((set, get) => ({
   activePage:  'dashboard',
   userRole:    null,   // 'superadmin' | 'admin' | 'teacher' | 'student'
   user:        null,   // { name, initials, role (label) }
+  userId:      null,   // auth uuid — used for chat & ownership checks
   schoolId:    null,   // uuid — null for superadmin
   schoolName:  null,   // short display name for the topbar
   searchQuery: '',
+
+  // ── Chat — pending DM to open when navigating to /chat ────────────────────
+  pendingDmUserId: null,
+  setPendingDmUserId: (id) => set({ pendingDmUserId: id }),
 
   // ── Router bridge (set by RouteSync in App.jsx) ───────────────────────────
   _navigate: null,
@@ -70,6 +77,7 @@ const useStore = create((set, get) => ({
 
     set({
       isLoggedIn:  true,
+      userId:      data.user.id,
       userRole:    profile.role,
       schoolId:    profile.school_id ?? null,
       schoolName:  profile.schools?.code || profile.schools?.name || null,
@@ -83,7 +91,7 @@ const useStore = create((set, get) => ({
   logout: async () => {
     await supabase.auth.signOut()
     set({
-      isLoggedIn: false, userRole: null, user: null, schoolId: null, schoolName: null,
+      isLoggedIn: false, userRole: null, userId: null, user: null, schoolId: null, schoolName: null,
       activePage: 'dashboard', searchQuery: '', authLoading: false,
     })
     get()._navigate?.('/login')
@@ -106,6 +114,7 @@ const useStore = create((set, get) => ({
     if (profile) {
       set({
         isLoggedIn:  true,
+        userId:      session.user.id,
         userRole:    profile.role,
         schoolId:    profile.school_id ?? null,
         schoolName:  profile.schools?.code || profile.schools?.name || null,

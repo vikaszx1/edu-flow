@@ -1,7 +1,7 @@
 import {
   LayoutGrid, Users, Calendar, ClipboardCheck, FileEdit,
   UserCog, FileBarChart2, Settings, LogOut, Layers,
-  GraduationCap, History, FileText, Building2, CreditCard, Server, X, BookOpen, Wand2,
+  GraduationCap, History, FileText, Building2, CreditCard, Server, X, BookOpen, Wand2, MessageSquare,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -13,8 +13,9 @@ const NAV_MAIN = [
   { id: 'students',   label: 'Students',    icon: Users,          roles: ['admin','teacher'],                        badge: null },
   { id: 'timetable',  label: 'Timetable',   icon: Calendar,       roles: ['admin','teacher','student'],              badge: null },
   { id: 'attendance', label: 'Attendance',  icon: ClipboardCheck, roles: ['admin','teacher'],                        badge: null },
-  { id: 'marks',           label: 'Marks Entry',        icon: FileEdit,  roles: ['admin','teacher'],           badge: null },
-  { id: 'questionpapers', label: 'Question Papers',    icon: Wand2,     roles: ['admin','teacher'],           badge: null },
+  { id: 'marks',           label: 'Marks Entry',        icon: FileEdit,       roles: ['admin','teacher'],                        badge: null },
+  { id: 'questionpapers', label: 'Question Papers',    icon: Wand2,          roles: ['admin','teacher'],                        badge: null },
+  { id: 'chat',           label: 'Messages',           icon: MessageSquare,  roles: ['admin','teacher','student'],              badge: null },
 ]
 
 const NAV_ADMIN = [

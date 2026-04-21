@@ -24,6 +24,7 @@ import Schools       from './pages/superadmin/Schools'
 import Principals    from './pages/superadmin/Principals'
 import Subscriptions from './pages/superadmin/Subscriptions'
 import System        from './pages/superadmin/System'
+import Chat          from './pages/Chat'
 
 function Spinner() {
   return (
@@ -108,6 +109,7 @@ export default function App() {
           <Route path="/mygrades"      element={<MyGrades />} />
           <Route path="/atthistory"    element={<AttHistory />} />
           <Route path="/leaverequests" element={<LeaveRequests />} />
+          <Route path="/chat"         element={<Chat />} />
           <Route path="/schools"       element={<Schools />} />
           <Route path="/principals"    element={<Principals />} />
           <Route path="/subscriptions" element={<Subscriptions />} />

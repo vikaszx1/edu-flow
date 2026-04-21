@@ -5,6 +5,8 @@ import useStore from '../../store/useStore'
 export default function Layout({ children }) {
   const sidebarOpen    = useStore(s => s.sidebarOpen)
   const setSidebarOpen = useStore(s => s.setSidebarOpen)
+  const activePage     = useStore(s => s.activePage)
+  const isChat         = activePage === 'chat'
 
   return (
     <div className="flex h-screen w-full overflow-hidden">
@@ -29,8 +31,8 @@ export default function Layout({ children }) {
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <Topbar />
         <main
-          className="flex-1 overflow-y-auto p-4 lg:p-6"
-          style={{ background: 'var(--bg)' }}
+          className={`flex-1 ${isChat ? 'overflow-hidden' : 'overflow-y-auto p-4 lg:p-6'}`}
+          style={{ background: isChat ? 'var(--surf)' : 'var(--bg)' }}
         >
           {children}
         </main>

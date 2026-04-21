@@ -80,3 +80,16 @@ body {
 .anim-row    { animation: fadeSlideUp 0.35s ease both; }
 .anim-card   { animation: fadeSlideUp 0.4s ease both; }
 .anim-number { animation: countUp 0.5s ease both; }
+
+/* Chat — typing indicator dots */
+@keyframes typingBounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+  30%           { transform: translateY(-4px); opacity: 1; }
+}
+
+/* Chat — new message slide-in */
+@keyframes msgIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.msg-in { animation: msgIn 0.18s ease both; }

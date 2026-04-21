@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { X, BookOpen, Mail } from 'lucide-react'
+import { X, BookOpen, Mail, MessageSquare } from 'lucide-react'
 import useCountUp from '../hooks/useCountUp'
 import Avatar from '../components/ui/Avatar'
 import Badge, { statusVariant } from '../components/ui/Badge'
@@ -20,6 +20,7 @@ function getColor(name = '')    { return 'av-' + COLORS[name.charCodeAt(0) % COL
 function dbToUI(s) {
   return {
     id:          s.id,
+    user_id:     s.user_id ?? null,
     initials:    getInitials(s.name),
     color:       getColor(s.name),
     name:        s.name,
@@ -34,7 +35,17 @@ function dbToUI(s) {
 
 // ── Staff Detail Modal ────────────────────────────────────────────────────────
 function StaffDetailModal({ member: s, onClose }) {
+  const setActivePage      = useStore(st => st.setActivePage)
+  const setPendingDmUserId = useStore(st => st.setPendingDmUserId)
+
   if (!s) return null
+
+  function handleMessage() {
+    setPendingDmUserId(s.user_id)
+    setActivePage('chat')
+    onClose()
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.35)' }}>
       <div className="rounded-[14px] border w-full max-w-[420px]" style={{ background: 'var(--surf)', borderColor: 'var(--bdr)' }}>
@@ -63,7 +74,21 @@ function StaffDetailModal({ member: s, onClose }) {
             ))}
           </div>
         </div>
-        <div className="px-5 py-3 border-t flex justify-end" style={{ borderColor: 'var(--bdr)' }}>
+        <div className="px-5 py-3 border-t flex items-center justify-between" style={{ borderColor: 'var(--bdr)' }}>
+          {s.user_id ? (
+            <button
+              onClick={handleMessage}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] text-[12px] font-medium transition-colors"
+              style={{ background: 'rgba(26,58,92,0.08)', color: 'var(--pri)' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(26,58,92,0.14)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'rgba(26,58,92,0.08)'}
+            >
+              <MessageSquare size={13} />
+              Send Message
+            </button>
+          ) : (
+            <span className="text-[11px]" style={{ color: 'var(--lgt)' }}>No login account</span>
+          )}
           <Button variant="outline" onClick={onClose}>Close</Button>
         </div>
       </div>
@@ -206,7 +231,7 @@ export default function Staff() {
     setLoading(true)
     const { data } = await supabase
       .from('staff')
-      .select('id, employee_id, name, email, department, designation, join_date, is_active')
+      .select('id, user_id, employee_id, name, email, department, designation, join_date, is_active')
       .eq('school_id', schoolId)
       .order('name')
     setStaff((data ?? []).map(dbToUI))
