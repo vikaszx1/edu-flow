@@ -59,6 +59,18 @@ export default function Chat() {
   const [replyTo, setReplyTo]         = useState(null)
   const [infoPanelOpen, setInfoPanel] = useState(false)
   const [searchOpen, setSearchOpen]   = useState(false)
+  // Mobile: 'sidebar' | 'chat'
+  const [mobileView, setMobileView]   = useState('sidebar')
+
+  function handleSelectConv(id) {
+    selectConv(id)
+    setMobileView('chat')
+  }
+
+  function handleStartDm(id) {
+    startDm(id)
+    setMobileView('chat')
+  }
 
   async function handleSend(content) {
     await sendMessage(content, replyTo?.id ?? null)
@@ -69,7 +81,7 @@ export default function Chat() {
 
   if (loading) return (
     <div className="h-full flex overflow-hidden" style={{ background: 'var(--surf)' }}>
-      <div className="w-[248px] flex-shrink-0 border-r" style={{ borderColor: 'var(--bdr)' }} />
+      <div className="hidden md:block w-[248px] flex-shrink-0 border-r" style={{ borderColor: 'var(--bdr)' }} />
       <LoadingPane />
     </div>
   )
@@ -78,50 +90,57 @@ export default function Chat() {
     <div className="h-full flex overflow-hidden" style={{ background: 'var(--surf)' }}>
 
       {/* ── Left: channel + DM list ──────────────────────────────────────── */}
-      <ChatSidebar
-        channels={channels}
-        dms={dms}
-        contacts={contacts}
-        activeConvId={activeConvId}
-        onSelectConv={selectConv}
-        onStartDm={startDm}
-      />
+      <div className={`${mobileView === 'chat' ? 'hidden' : 'flex'} md:flex w-full md:w-auto flex-shrink-0`}>
+        <ChatSidebar
+          channels={channels}
+          dms={dms}
+          contacts={contacts}
+          activeConvId={activeConvId}
+          onSelectConv={handleSelectConv}
+          onStartDm={handleStartDm}
+        />
+      </div>
 
       {/* ── Middle: message area ─────────────────────────────────────────── */}
-      {!activeConvId ? (
-        <WelcomePlaceholder />
-      ) : (
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden" style={{ background: 'var(--surf)' }}>
-          <ChatHeader
-            activeConv={activeConv}
-            infoPanelOpen={infoPanelOpen}
-            onToggleInfo={() => setInfoPanel(v => !v)}
-            searchOpen={searchOpen}
-            onToggleSearch={() => setSearchOpen(v => !v)}
-          />
+      <div className={`${mobileView === 'sidebar' ? 'hidden' : 'flex'} md:flex flex-1 flex-col min-w-0 overflow-hidden`}
+        style={{ background: 'var(--surf)' }}
+      >
+        {!activeConvId ? (
+          <WelcomePlaceholder />
+        ) : (
+          <>
+            <ChatHeader
+              activeConv={activeConv}
+              infoPanelOpen={infoPanelOpen}
+              onToggleInfo={() => setInfoPanel(v => !v)}
+              searchOpen={searchOpen}
+              onToggleSearch={() => setSearchOpen(v => !v)}
+              onBack={() => setMobileView('sidebar')}
+            />
 
-          <MessageList
-            messages={messages}
-            loading={msgsLoading}
-            activeConv={activeConv}
-            userId={userId}
-            contacts={contacts}
-            onReact={toggleReaction}
-            onReply={setReplyTo}
-            onEdit={editMessage}
-            onDelete={deleteMessage}
-            onPin={pinMessage}
-          />
+            <MessageList
+              messages={messages}
+              loading={msgsLoading}
+              activeConv={activeConv}
+              userId={userId}
+              contacts={contacts}
+              onReact={toggleReaction}
+              onReply={setReplyTo}
+              onEdit={editMessage}
+              onDelete={deleteMessage}
+              onPin={pinMessage}
+            />
 
-          <MessageInput
-            onSend={handleSend}
-            replyTo={replyTo}
-            onCancelReply={() => setReplyTo(null)}
-            convName={activeConv?.name ?? null}
-            readonly={activeIsReadonly}
-          />
-        </div>
-      )}
+            <MessageInput
+              onSend={handleSend}
+              replyTo={replyTo}
+              onCancelReply={() => setReplyTo(null)}
+              convName={activeConv?.name ?? null}
+              readonly={activeIsReadonly}
+            />
+          </>
+        )}
+      </div>
 
       {/* ── Right: info panel ────────────────────────────────────────────── */}
       {infoPanelOpen && activeConv && (

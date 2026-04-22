@@ -121,13 +121,13 @@ export default function MessageInput({ onSend, replyTo, onCancelReply, convName,
 
       {/* Composer box */}
       <div
-        className="flex flex-col rounded-[10px] border overflow-hidden transition-all"
+        className="flex flex-col rounded-[10px] border transition-all"
         style={{ borderColor: 'var(--bdr)' }}
         onFocusCapture={e => e.currentTarget.style.borderColor = 'var(--pri)'}
         onBlurCapture={e => e.currentTarget.style.borderColor = 'var(--bdr)'}
       >
         {/* Formatting toolbar */}
-        <div className="flex items-center gap-0.5 px-2.5 pt-2 pb-1 border-b" style={{ borderColor: 'var(--bdr)' }}>
+        <div className="flex items-center gap-0.5 px-2.5 pt-2 pb-1 border-b rounded-t-[10px] overflow-hidden" style={{ borderColor: 'var(--bdr)' }}>
           <FmtBtn icon={Bold}   title="Bold (wrap in **)"    onClick={() => insertFormat('**')} />
           <FmtBtn icon={Italic} title="Italic (wrap in _)"   onClick={() => insertFormat('_')} />
           <FmtBtn icon={Code}   title="Inline code (wrap in `)" onClick={() => insertFormat('`')} />
@@ -163,7 +163,7 @@ export default function MessageInput({ onSend, replyTo, onCancelReply, convName,
                 <Smile size={15} />
               </button>
               {showEmoji && (
-                <div className="absolute bottom-9 left-0 z-50 shadow-xl rounded-[12px] overflow-hidden">
+                <div className="absolute bottom-10 left-0 z-[200] shadow-xl rounded-[12px] overflow-hidden">
                   <Picker
                     data={data}
                     onEmojiSelect={e => insertEmoji(e.native)}

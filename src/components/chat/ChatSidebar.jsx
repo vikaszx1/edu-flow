@@ -37,7 +37,7 @@ export default function ChatSidebar({ channels, dms, contacts, activeConvId, onS
 
   return (
     <div
-      className="w-[248px] flex-shrink-0 flex flex-col h-full overflow-hidden border-r"
+      className="w-full md:w-[248px] flex-shrink-0 flex flex-col h-full overflow-hidden md:border-r"
       style={{ background: 'var(--surf)', borderColor: 'var(--bdr)' }}
     >
       {/* Header */}

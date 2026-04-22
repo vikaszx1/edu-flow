@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import useStore from '../store/useStore'
 
+const toast = (type, msg) => useStore.getState().toast(type, msg)
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const AV_COLORS = ['bl', 'tl', 'co', 'pu', 'am', 'pk', 'gn']
 const ROLE_LABELS = { admin: 'Principal', teacher: 'Teacher', student: 'Student', superadmin: 'Super Admin' }
@@ -220,8 +222,9 @@ export default function useChat() {
       `)
       .single()
 
+    if (error) { toast('error', 'Failed to send message'); return { error } }
     if (data) setMessages(prev => [...prev, { ...data, sender: shapeUser(data.sender) }])
-    return { error }
+    return { error: null }
   }, [activeConvId, schoolId, userId])
 
   // ── Edit message ──────────────────────────────────────────────────────────────
@@ -232,8 +235,8 @@ export default function useChat() {
       .eq('id', msgId)
       .eq('sender_id', userId)
 
-    if (!error)
-      setMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: content.trim(), is_edited: true } : m))
+    if (error) { toast('error', 'Could not edit message'); return }
+    setMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: content.trim(), is_edited: true } : m))
   }, [userId])
 
   // ── Delete message ────────────────────────────────────────────────────────────
@@ -242,7 +245,8 @@ export default function useChat() {
       .from('chat_messages')
       .delete()
       .eq('id', msgId)
-    if (!error) setMessages(prev => prev.filter(m => m.id !== msgId))
+    if (error) { toast('error', 'Could not delete message'); return }
+    setMessages(prev => prev.filter(m => m.id !== msgId))
   }, [])
 
   // ── Toggle reaction ───────────────────────────────────────────────────────────
@@ -287,22 +291,18 @@ export default function useChat() {
     const existing = dms.find(d => d.contact?.id === contactId)
     if (existing) { selectConv(existing.id); return }
 
-    const { data: conv, error } = await supabase
-      .from('chat_conversations')
-      .insert({ school_id: schoolId, type: 'dm' })
-      .select().single()
+    const { data: convId, error } = await supabase
+      .rpc('start_dm_conversation', { target_user_id: contactId })
 
-    if (error || !conv) return
-
-    await supabase.from('chat_participants').insert([
-      { conversation_id: conv.id, user_id: userId },
-      { conversation_id: conv.id, user_id: contactId },
-    ])
+    if (error || !convId) {
+      toast('error', 'Could not start conversation. ' + (error?.message ?? ''))
+      return
+    }
 
     const contact = contacts.find(c => c.id === contactId)
-    setDms(prev => [{ id: conv.id, contact, unread: 0 }, ...prev])
-    selectConv(conv.id)
-  }, [dms, contacts, schoolId, userId, selectConv])
+    setDms(prev => [{ id: convId, contact, unread: 0 }, ...prev])
+    selectConv(convId)
+  }, [dms, contacts, selectConv])
 
   // ── Derived ───────────────────────────────────────────────────────────────────
   const activeConv =

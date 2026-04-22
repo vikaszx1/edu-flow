@@ -1,4 +1,4 @@
-import { Hash, Lock, Phone, Video, Search, Pin, Users, Info } from 'lucide-react'
+import { Hash, Lock, Phone, Video, Search, Pin, Users, Info, ArrowLeft } from 'lucide-react'
 
 function ActionBtn({ icon: Icon, title, onClick, active }) {
   return (
@@ -15,7 +15,7 @@ function ActionBtn({ icon: Icon, title, onClick, active }) {
   )
 }
 
-export default function ChatHeader({ activeConv, onToggleInfo, infoPanelOpen, onToggleSearch, searchOpen }) {
+export default function ChatHeader({ activeConv, onToggleInfo, infoPanelOpen, onToggleSearch, searchOpen, onBack }) {
   if (!activeConv) return (
     <div className="h-[54px] flex-shrink-0 border-b flex items-center px-4" style={{ borderColor: 'var(--bdr)' }}>
       <span className="text-[13px]" style={{ color: 'var(--lgt)' }}>Select a conversation to start messaging</span>
@@ -27,9 +27,20 @@ export default function ChatHeader({ activeConv, onToggleInfo, infoPanelOpen, on
 
   return (
     <div
-      className="h-[54px] flex-shrink-0 border-b flex items-center gap-3 px-4"
+      className="h-[54px] flex-shrink-0 border-b flex items-center gap-2 px-3 md:px-4"
       style={{ background: 'var(--surf)', borderColor: 'var(--bdr)' }}
     >
+      {/* Back button — mobile only */}
+      <button
+        onClick={onBack}
+        className="md:hidden w-8 h-8 flex items-center justify-center rounded-[7px] flex-shrink-0 transition-colors"
+        style={{ color: 'var(--mut)' }}
+        onMouseEnter={e => e.currentTarget.style.background = 'var(--bg)'}
+        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+      >
+        <ArrowLeft size={17} />
+      </button>
+
       {/* Identity */}
       <div className="flex items-center gap-2 flex-1 min-w-0">
         {isChannel ? (
