@@ -25,6 +25,7 @@ import Principals    from './pages/superadmin/Principals'
 import Subscriptions from './pages/superadmin/Subscriptions'
 import System        from './pages/superadmin/System'
 import Chat          from './pages/Chat'
+import ResetPassword from './pages/ResetPassword'
 
 function Spinner() {
   return (
@@ -92,7 +93,8 @@ export default function App() {
       <Routes>
         {/* Public */}
         <Route path="/"      element={<Landing />} />
-        <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
+        <Route path="/login"          element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         {/* Protected — all share the sidebar + topbar layout */}
         <Route element={<PrivateLayout />}>

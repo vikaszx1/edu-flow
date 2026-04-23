@@ -12,7 +12,9 @@
       "mcp__supabase__execute_sql",
       "mcp__supabase__get_logs",
       "Bash(npx vite:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(ls E:/my-projects/edu-flow/.env*)",
+      "Bash(firebase --version)"
     ]
   },
   "enableAllProjectMcpServers": true,

@@ -7,6 +7,7 @@ import ChatHeader    from '../components/chat/ChatHeader'
 import MessageList   from '../components/chat/MessageList'
 import MessageInput  from '../components/chat/MessageInput'
 import ChatInfoPanel from '../components/chat/ChatInfoPanel'
+import CallModal     from '../components/chat/CallModal'
 
 function LoadingPane() {
   return (
@@ -40,7 +41,7 @@ function WelcomePlaceholder() {
 }
 
 export default function Chat() {
-  const { userId, pendingDmUserId, setPendingDmUserId } = useStore()
+  const { userId, user, pendingDmUserId, setPendingDmUserId } = useStore()
   const {
     contacts, channels, dms, messages,
     activeConvId, activeConv,
@@ -61,6 +62,8 @@ export default function Chat() {
   const [searchOpen, setSearchOpen]   = useState(false)
   // Mobile: 'sidebar' | 'chat'
   const [mobileView, setMobileView]   = useState('sidebar')
+  // Call state
+  const [callState, setCallState]     = useState({ open: false, type: null })
 
   function handleSelectConv(id) {
     selectConv(id)
@@ -75,6 +78,10 @@ export default function Chat() {
   async function handleSend(content) {
     await sendMessage(content, replyTo?.id ?? null)
     setReplyTo(null)
+  }
+
+  function startCall(type) {
+    if (activeConv?.contact) setCallState({ open: true, type })
   }
 
   const activeIsReadonly = Boolean(activeConv?.is_readonly)
@@ -116,6 +123,8 @@ export default function Chat() {
               searchOpen={searchOpen}
               onToggleSearch={() => setSearchOpen(v => !v)}
               onBack={() => setMobileView('sidebar')}
+              onVoiceCall={() => startCall('audio')}
+              onVideoCall={() => startCall('video')}
             />
 
             <MessageList
@@ -149,6 +158,17 @@ export default function Chat() {
           contacts={contacts}
           messages={messages}
           onClose={() => setInfoPanel(false)}
+        />
+      )}
+
+      {/* ── Call modal ───────────────────────────────────────────────────── */}
+      {callState.open && activeConv?.contact && (
+        <CallModal
+          contact={activeConv.contact}
+          callType={callState.type}
+          userId={userId}
+          userName={user?.name ?? userId}
+          onClose={() => setCallState({ open: false, type: null })}
         />
       )}
     </div>

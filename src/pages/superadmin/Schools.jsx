@@ -48,14 +48,23 @@ function RegisterModal({ onClose, onRegister }) {
     setError('')
 
     // 1. Insert school
-    const code = form.name.split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 6)
+    const initials = form.name.split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 4)
+    const suffix = Math.random().toString(36).slice(2, 5).toUpperCase()
+    const code = `${initials}${suffix}`
     const { data: school, error: schoolErr } = await supabase
       .from('schools')
       .insert({ name: form.name, city: form.city, address: form.state, code, is_active: true })
       .select('id, name, city')
       .single()
 
-    if (schoolErr) { setError('School save failed: ' + schoolErr.message); setSaving(false); return }
+    if (schoolErr) {
+      const msg = schoolErr.message?.includes('schools_code_key')
+        ? 'A school with a similar name already exists. Please use a more distinct name.'
+        : schoolErr.message?.includes('schools_name_key')
+        ? 'A school with this name already exists.'
+        : 'Failed to save school. Please try again.'
+      setError(msg); setSaving(false); return
+    }
 
     // 2. Create principal auth account (preserving current superadmin session)
     const { data: { session: currentSession } } = await supabase.auth.getSession()
@@ -75,6 +84,11 @@ function RegisterModal({ onClose, onRegister }) {
     }
 
     if (authErr) { setError('Principal account failed: ' + authErr.message); setSaving(false); return }
+
+    // Send password-setup email so the principal can set their own password
+    await supabase.auth.resetPasswordForEmail(form.principalEmail, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    })
 
     // 3. Save principal to public.users
     const { error: userErr } = await supabase.from('users').insert({
@@ -241,7 +255,7 @@ function RegisterModal({ onClose, onRegister }) {
 
           <div className="flex items-center justify-between mt-4 pt-4 border-t" style={{ borderColor: 'var(--bdr)' }}>
             {step === 2
-              ? <button type="button" onClick={() => setStep(1)} disabled={saving}
+              ? <button type="button" onClick={() => { setStep(1); setError('') }} disabled={saving}
                   className="px-4 py-2 rounded-[7px] text-[13px] border"
                   style={{ borderColor: 'var(--bdr)', color: 'var(--mut)' }}>
                   ← Back

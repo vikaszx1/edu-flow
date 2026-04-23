@@ -15,7 +15,7 @@ function ActionBtn({ icon: Icon, title, onClick, active }) {
   )
 }
 
-export default function ChatHeader({ activeConv, onToggleInfo, infoPanelOpen, onToggleSearch, searchOpen, onBack }) {
+export default function ChatHeader({ activeConv, onToggleInfo, infoPanelOpen, onToggleSearch, searchOpen, onBack, onVoiceCall, onVideoCall }) {
   if (!activeConv) return (
     <div className="h-[54px] flex-shrink-0 border-b flex items-center px-4" style={{ borderColor: 'var(--bdr)' }}>
       <span className="text-[13px]" style={{ color: 'var(--lgt)' }}>Select a conversation to start messaging</span>
@@ -90,8 +90,8 @@ export default function ChatHeader({ activeConv, onToggleInfo, infoPanelOpen, on
         {!isChannel && (
           <>
             <div className="w-px h-4 mx-1" style={{ background: 'var(--bdr)' }} />
-            <ActionBtn icon={Phone} title="Voice call (coming soon)" />
-            <ActionBtn icon={Video} title="Video call (coming soon)" />
+            <ActionBtn icon={Phone} title="Voice call" onClick={onVoiceCall} />
+            <ActionBtn icon={Video} title="Video call" onClick={onVideoCall} />
           </>
         )}
         {isChannel && <ActionBtn icon={Users} title="Members" onClick={onToggleInfo} active={infoPanelOpen} />}

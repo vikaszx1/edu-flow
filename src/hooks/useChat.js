@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import useStore from '../store/useStore'
 
@@ -303,6 +303,92 @@ export default function useChat() {
     setDms(prev => [{ id: convId, contact, unread: 0 }, ...prev])
     selectConv(convId)
   }, [dms, contacts, selectConv])
+
+  // ── Real-time: keep activeConvId in a ref so background callbacks stay current ──
+  const activeConvIdRef = useRef(activeConvId)
+  useEffect(() => { activeConvIdRef.current = activeConvId }, [activeConvId])
+
+  // ── Real-time: active conversation (INSERT / UPDATE / DELETE) ─────────────────
+  useEffect(() => {
+    if (!activeConvId || !userId) return
+
+    const ch = supabase
+      .channel(`conv:${activeConvId}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages',
+          filter: `conversation_id=eq.${activeConvId}` },
+        async (payload) => {
+          const raw = payload.new
+          if (raw.sender_id === userId) return   // already added optimistically
+
+          // Fetch full message with joined sender + reply_to
+          const { data } = await supabase
+            .from('chat_messages')
+            .select(`*, sender:users!sender_id(id, name, role),
+              reply_to:chat_messages!reply_to_id(id, content, reply_sender:users!sender_id(name))`)
+            .eq('id', raw.id)
+            .single()
+
+          if (!data) return
+          setMessages(prev => prev.find(m => m.id === data.id)
+            ? prev
+            : [...prev, { ...data, sender: shapeUser(data.sender) }]
+          )
+
+          // Mark as read since user is viewing this conversation
+          supabase.from('chat_participants').upsert(
+            { conversation_id: activeConvId, user_id: userId, last_read_at: new Date().toISOString() },
+            { onConflict: 'conversation_id,user_id' }
+          )
+        }
+      )
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'chat_messages',
+          filter: `conversation_id=eq.${activeConvId}` },
+        (payload) => {
+          const updated = payload.new
+          setMessages(prev => prev.map(m =>
+            m.id === updated.id
+              ? { ...m, content: updated.content, is_edited: updated.is_edited,
+                  is_pinned: updated.is_pinned, reactions: updated.reactions }
+              : m
+          ))
+        }
+      )
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'chat_messages',
+          filter: `conversation_id=eq.${activeConvId}` },
+        (payload) => {
+          setMessages(prev => prev.filter(m => m.id !== payload.old.id))
+        }
+      )
+      .subscribe()
+
+    return () => { supabase.removeChannel(ch) }
+  }, [activeConvId, userId])
+
+  // ── Real-time: background unread counter for all other conversations ──────────
+  useEffect(() => {
+    if (!userId || !schoolId) return
+
+    const ch = supabase
+      .channel(`unread:${userId}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages',
+          filter: `school_id=eq.${schoolId}` },
+        (payload) => {
+          const msg = payload.new
+          if (msg.sender_id === userId) return              // own message
+          if (msg.conversation_id === activeConvIdRef.current) return  // already viewing
+
+          setChannels(prev => prev.map(c =>
+            c.id === msg.conversation_id ? { ...c, unread: (c.unread || 0) + 1 } : c
+          ))
+          setDms(prev => prev.map(d =>
+            d.id === msg.conversation_id ? { ...d, unread: (d.unread || 0) + 1 } : d
+          ))
+        }
+      )
+      .subscribe()
+
+    return () => { supabase.removeChannel(ch) }
+  }, [userId, schoolId])
 
   // ── Derived ───────────────────────────────────────────────────────────────────
   const activeConv =

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Layers, Eye, EyeOff } from 'lucide-react'
 import useStore from '../store/useStore'
+import { supabase } from '../lib/supabase'
 
 const DEMO_CREDENTIALS = [
   { role: 'Super Admin', email: 'superadmin@eduflow.in', password: 'Admin@1234',    badge: 'badge-purple', desc: 'Control Tower + Billing'  },
@@ -11,11 +12,15 @@ const DEMO_CREDENTIALS = [
 
 export default function Login() {
   const login = useStore(s => s.login)
-  const [email, setEmail]       = useState('')
-  const [password, setPassword] = useState('')
-  const [showPwd, setShowPwd]   = useState(false)
-  const [error, setError]       = useState('')
-  const [loading, setLoading]   = useState(false)
+  const [email, setEmail]           = useState('')
+  const [password, setPassword]     = useState('')
+  const [showPwd, setShowPwd]       = useState(false)
+  const [error, setError]           = useState('')
+  const [loading, setLoading]       = useState(false)
+  const [forgotMode, setForgotMode] = useState(false)
+  const [resetEmail, setResetEmail] = useState('')
+  const [resetSent, setResetSent]   = useState(false)
+  const [resetLoading, setResetLoading] = useState(false)
 
   const handleSubmit = async e => {
     e.preventDefault()
@@ -24,6 +29,16 @@ export default function Login() {
     const result = await login(email, password)
     if (!result.ok) setError(result.error)
     setLoading(false)
+  }
+
+  const handleForgot = async e => {
+    e.preventDefault()
+    setResetLoading(true)
+    await supabase.auth.resetPasswordForEmail(resetEmail, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    })
+    setResetLoading(false)
+    setResetSent(true)
   }
 
   const fillCredential = cred => {
@@ -106,7 +121,55 @@ export default function Login() {
             ))}
           </div>
 
-          {/* Form */}
+          {/* Forgot password form */}
+          {forgotMode ? (
+            resetSent ? (
+              <div className="text-center py-4">
+                <div className="text-[13px] font-medium mb-1" style={{ color: 'var(--txt)' }}>Check your inbox</div>
+                <div className="text-[12px] mb-4" style={{ color: 'var(--mut)' }}>
+                  A password reset link has been sent to <strong>{resetEmail}</strong>.
+                </div>
+                <button
+                  onClick={() => { setForgotMode(false); setResetSent(false); setResetEmail('') }}
+                  className="text-[12px] font-medium" style={{ color: 'var(--pri)' }}
+                >
+                  Back to sign in
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleForgot} className="flex flex-col gap-3">
+                <div>
+                  <label className="block text-[11px] font-medium mb-1" style={{ color: 'var(--mut)' }}>Your Email</label>
+                  <input
+                    type="email"
+                    value={resetEmail}
+                    onChange={e => setResetEmail(e.target.value)}
+                    required
+                    autoFocus
+                    placeholder="you@school.in"
+                    className="w-full px-3 py-2.5 border rounded-[8px] text-[13px] font-dmsans outline-none"
+                    style={{ borderColor: 'var(--bdr)', background: 'var(--surf)', color: 'var(--txt)' }}
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={resetLoading}
+                  className="w-full py-2.5 rounded-[8px] text-[13px] font-medium text-white mt-1"
+                  style={{ background: 'var(--pri)', opacity: resetLoading ? 0.7 : 1 }}
+                >
+                  {resetLoading ? 'Sending…' : 'Send Reset Link'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setForgotMode(false)}
+                  className="text-[12px] text-center" style={{ color: 'var(--mut)' }}
+                >
+                  Back to sign in
+                </button>
+              </form>
+            )
+          ) : (
+          /* Sign-in form */
           <form onSubmit={handleSubmit} className="flex flex-col gap-3">
             <div>
               <label className="block text-[11px] font-medium mb-1" style={{ color: 'var(--mut)' }}>Email</label>
@@ -127,7 +190,16 @@ export default function Login() {
             </div>
 
             <div>
-              <label className="block text-[11px] font-medium mb-1" style={{ color: 'var(--mut)' }}>Password</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[11px] font-medium" style={{ color: 'var(--mut)' }}>Password</label>
+                <button
+                  type="button"
+                  onClick={() => { setForgotMode(true); setResetEmail(email) }}
+                  className="text-[11px]" style={{ color: 'var(--pri)' }}
+                >
+                  Forgot password?
+                </button>
+              </div>
               <div className="relative">
                 <input
                   type={showPwd ? 'text' : 'password'}
@@ -169,6 +241,7 @@ export default function Login() {
               {loading ? 'Signing in…' : 'Sign In'}
             </button>
           </form>
+          )}
         </div>
       </div>
     </div>
